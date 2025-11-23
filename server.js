@@ -27,6 +27,7 @@ const initDatabase = async () => {
         name TEXT NOT NULL,
         email TEXT,
         card_id TEXT UNIQUE NOT NULL,
+        included_hours INT4 DEFAULT 0,
         created_at TEXT NOT NULL
       );
     `);
@@ -117,7 +118,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 app.post('/api/users', async (req, res) => {
-  const { name, email, card_id } = req.body;
+  const { name, email, card_id, included_hours } = req.body;
   if (!name || !card_id) return res.status(400).json({ error: 'Name and card_id required' });
 
   const id = Date.now().toString();
@@ -125,11 +126,11 @@ app.post('/api/users', async (req, res) => {
 
   try {
     await pool.query(
-      'INSERT INTO users (id, name, email, card_id, created_at) VALUES ($1, $2, $3, $4, $5)',
-      [id, name, email || '', card_id, created_at]
+      'INSERT INTO users (id, name, email, card_id, included_hours, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, name, email || '', card_id, included_hours || 0, created_at]
     );
     console.log(`✓ New user created: ${name}`);
-    res.json({ id, name, email, card_id, created_at });
+    res.json({ id, name, email, card_id, included_hours: included_hours || 0, created_at });
   } catch (error) {
     if (error.code === '23505') res.status(400).json({ error: 'Card ID already exists' });
     else {
@@ -140,14 +141,14 @@ app.post('/api/users', async (req, res) => {
 });
 
 app.put('/api/users/:id', async (req, res) => {
-  const { name, email, card_id } = req.body;
+  const { name, email, card_id, included_hours } = req.body;
   try {
     await pool.query(
-      'UPDATE users SET name=$1, email=$2, card_id=$3 WHERE id=$4',
-      [name, email || '', card_id, req.params.id]
+      'UPDATE users SET name=$1, email=$2, card_id=$3, included_hours=$4 WHERE id=$5',
+      [name, email || '', card_id, included_hours || 0, req.params.id]
     );
     console.log(`✓ User updated: ${name}`);
-    res.json({ id: req.params.id, name, email, card_id });
+    res.json({ id: req.params.id, name, email, card_id, included_hours: included_hours || 0 });
   } catch (error) {
     if (error.code === '23505') res.status(400).json({ error: 'Card ID already exists' });
     else {
