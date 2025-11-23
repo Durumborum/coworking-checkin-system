@@ -13,6 +13,7 @@ function CoworkingApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Chart & date range state
   const [chartStart, setChartStart] = useState('');
   const [chartEnd, setChartEnd] = useState('');
   const [dailyActiveData, setDailyActiveData] = useState([]);
@@ -44,6 +45,7 @@ function CoworkingApp() {
     }
   };
 
+  // --- Check-in ---
   const handleCheckIn = async (cardId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/checkin`, {
@@ -63,6 +65,7 @@ function CoworkingApp() {
     }
   };
 
+  // --- Add User ---
   const addUser = async () => {
     if (!newUser.name || !newUser.cardId) {
       alert('Name and Card ID are required');
@@ -76,7 +79,7 @@ function CoworkingApp() {
           name: newUser.name,
           email: newUser.email,
           card_id: newUser.cardId,
-          included_hours: newUser.included_hours ?? 0
+          included_hours: parseInt(newUser.included_hours) || 0
         })
       });
       if (!response.ok) {
@@ -91,6 +94,32 @@ function CoworkingApp() {
     }
   };
 
+  // --- Update User ---
+  const updateUser = async (user) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: user.name,
+          email: user.email,
+          card_id: user.card_id,
+          included_hours: parseInt(user.included_hours) || 0
+        })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || 'Failed to save user');
+      } else {
+        setEditingUser(null);
+        loadData();
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    }
+  };
+
+  // --- Delete User ---
   const deleteUser = async (id) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
@@ -101,35 +130,26 @@ function CoworkingApp() {
     }
   };
 
+  // --- Stats ---
   const getCurrentlyCheckedIn = () => checkIns.filter(c => !c.check_out);
   const getTodayCheckIns = () => {
     const today = new Date().toDateString();
     return checkIns.filter(c => new Date(c.check_in).toDateString() === today);
   };
-
-  // Returns user stats including hours used vs included_hours
-  const getUserStats = (user) => {
+  const getUserStats = (userId) => {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const userCheckIns = checkIns.filter(c => c.user_id === user.id && c.check_out && new Date(c.check_in) >= firstDay);
+    const userCheckIns = checkIns.filter(c => c.user_id === userId && c.check_out && new Date(c.check_in) >= firstDay);
     const totalMinutes = userCheckIns.reduce((acc, c) => acc + (new Date(c.check_out) - new Date(c.check_in)) / 60000, 0);
-    const totalHours = Math.floor(totalMinutes / 60);
     const uniqueDays = [...new Set(userCheckIns.map(c => new Date(c.check_in).toDateString()))].length;
-
-    let status = '';
-    if (user.included_hours > 0) {
-      if (totalHours >= user.included_hours) status = '⚠ Over limit';
-      else if (totalHours >= user.included_hours * 0.8) status = '⚠ Approaching limit';
-    }
-
     return {
       checkIns: userCheckIns.length,
-      hours: totalHours,
-      uniqueDays,
-      status
+      hours: Math.floor(totalMinutes / 60),
+      uniqueDays
     };
   };
 
+  // --- Daily Active Users ---
   const generateDailyActiveUsersChart = (checkInsData) => {
     const end = chartEnd ? new Date(chartEnd) : new Date();
     const start = chartStart ? new Date(chartStart) : new Date(end.getTime() - 29*24*60*60*1000);
@@ -160,7 +180,11 @@ function CoworkingApp() {
     <div className="min-h-screen font-quattrocento text-black bg-white">
       <div className="container mx-auto p-6">
         <header className="mb-6 flex items-center gap-4">
-          <img src="rami_logo_new.avif" alt="Rami Ceramics Logo" className="h-12 w-auto object-contain"/>
+          <img 
+            src="rami_logo_new.avif" 
+            alt="Rami Ceramics Logo" 
+            className="h-12 w-auto object-contain"
+          />
           <div>
             <h1 className="text-3xl font-bold mb-1">Rami Ceramics Coworking</h1>
             <p className="text-secondary">Check-in/out Management</p>
@@ -197,7 +221,6 @@ function CoworkingApp() {
         {/* --- USERS --- */}
         {activeTab==='users' && (
           <div className="space-y-6">
-            {/* Add New User */}
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Add New User</h2>
               <div className="flex gap-2 flex-wrap">
@@ -209,65 +232,44 @@ function CoworkingApp() {
               </div>
             </div>
 
-            {/* Registered Users */}
-            <div className="p-4 border rounded shadow">
-              <h2 className="font-bold mb-2">Registered Users</h2>
-              {users.map(user => (
-                <div key={user.id} className="p-4 border border-secondary rounded mb-2">
-                  {editingUser?.id === user.id ? (
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                      <input type="text" value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="px-3 py-2 border rounded"/>
-                      <input type="email" value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="px-3 py-2 border rounded"/>
-                      <input type="text" value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="px-3 py-2 border rounded"/>
-                      <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:parseInt(e.target.value)||0})} className="px-3 py-2 border rounded"/>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(editingUser)
-                              });
-                              if (!res.ok) {
-                                const err = await res.json();
-                                alert(err.error || 'Failed to save user');
-                              } else {
-                                setEditingUser(null);
-                                loadData();
-                              }
-                            } catch (err) {
-                              alert('Network error: ' + err.message);
-                            }
-                          }}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          💾 Save
-                        </button>
-                        <button onClick={()=>setEditingUser(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">✖</button>
+            <div className="bg-white rounded-xl p-6 shadow-lg border border-secondary">
+              <h2 className="text-xl font-bold mb-4">📋 Registered Users</h2>
+              <div className="space-y-3">
+                {users.map(user => (
+                  <div key={user.id} className="p-4 border border-secondary rounded">
+                    {editingUser?.id === user.id ? (
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <input type="text" value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="px-3 py-2 border rounded"/>
+                        <input type="email" value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="px-3 py-2 border rounded"/>
+                        <input type="text" value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="px-3 py-2 border rounded"/>
+                        <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:parseInt(e.target.value)||0})} className="px-3 py-2 border rounded"/>
+                        <div className="flex gap-2">
+                          <button onClick={()=>updateUser(editingUser)} className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">💾 Save</button>
+                          <button onClick={()=>setEditingUser(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">✖</button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold">{user.name}</p>
-                        <p className="text-sm">{user.email}</p>
-                        <p className="text-xs">Card ID: {user.card_id}</p>
-                        <p className="text-xs">Included Hours: {user.included_hours}h</p>
-                        {(() => {
-                          const stats = getUserStats(user);
-                          return <p className={`text-xs text-secondary ${stats.status ? 'text-red-600 font-bold' : ''}`}>{stats.checkIns} visits • {stats.hours}h used • {stats.uniqueDays} days {stats.status}</p>
-                        })()}
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold">{user.name}</p>
+                          <p className="text-sm">{user.email}</p>
+                          <p className="text-xs">Card ID: {user.card_id}</p>
+                          <p className="text-xs">Included Hours: {user.included_hours}h</p>
+                          {(() => {
+                            const stats = getUserStats(user.id);
+                            return <p className="text-xs text-secondary">{stats.checkIns} visits • {stats.hours}h • {stats.uniqueDays} days</p>
+                          })()}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={()=>setEditingUser(user)} className="px-4 py-2 text-blue-600 rounded">✏️</button>
+                          <button onClick={()=>deleteUser(user.id)} className="px-4 py-2 text-red-600 rounded">🗑️</button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={()=>setEditingUser(user)} className="px-4 py-2 text-blue-600 rounded">✏️</button>
-                        <button onClick={()=>deleteUser(user.id)} className="px-4 py-2 text-red-600 rounded">🗑️</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {users.length===0 && <p className="text-center text-secondary py-4">No users registered yet.</p>}
+                    )}
+                  </div>
+                ))}
+                {users.length===0 && <p className="text-center text-secondary py-4">No users registered yet.</p>}
+              </div>
             </div>
           </div>
         )}
@@ -300,6 +302,7 @@ function CoworkingApp() {
                 </table>
               </div>
             </div>
+
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Daily Active Users (Last 30 Days)</h2>
               <div className="flex gap-2 mb-2">
