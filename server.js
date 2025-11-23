@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 const path = require('path');
 
 const app = express();
@@ -10,31 +10,46 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Database setup
-const db = new Database('coworking.db');
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
 // Initialize database tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT,
-    card_id TEXT UNIQUE NOT NULL,
-    created_at TEXT NOT NULL
-  );
+const initDatabase = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT,
+        card_id TEXT UNIQUE NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
 
-  CREATE TABLE IF NOT EXISTS checkins (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    user_name TEXT NOT NULL,
-    check_in TEXT NOT NULL,
-    check_out TEXT,
-    duration TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS checkins (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        check_in TEXT NOT NULL,
+        check_out TEXT,
+        duration TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+    `);
 
-console.log('✓ Database initialized');
+    console.log('✓ Database initialized');
+  } catch (error) {
+    console.error('Database initialization error:', error);
+  }
+};
+
+initDatabase();
 
 // API Routes
 
@@ -44,72 +59,89 @@ app.get('/api/health', (req, res) => {
 });
 
 // Check-in/out endpoint (for Raspberry Pi)
-app.post('/api/checkin', (req, res) => {
+app.post('/api/checkin', async (req, res) => {
   const { card_id, timestamp } = req.body;
 
   if (!card_id) {
     return res.status(400).json({ error: 'Card ID required' });
   }
 
-  // Find user by card ID
-  const user = db.prepare('SELECT * FROM users WHERE card_id = ?').get(card_id);
+  try {
+    // Find user by card ID
+    const userResult = await pool.query('SELECT * FROM users WHERE card_id = $1', [card_id]);
+    const user = userResult.rows[0];
 
-  if (!user) {
-    return res.status(404).json({ error: 'Card not registered' });
-  }
+    if (!user) {
+      return res.status(404).json({ error: 'Card not registered' });
+    }
 
-  // Check if user has an active session
-  const activeSession = db.prepare(
-    'SELECT * FROM checkins WHERE user_id = ? AND check_out IS NULL'
-  ).get(user.id);
+    // Check if user has an active session
+    const sessionResult = await pool.query(
+      'SELECT * FROM checkins WHERE user_id = $1 AND check_out IS NULL',
+      [user.id]
+    );
+    const activeSession = sessionResult.rows[0];
 
-  if (activeSession) {
-    // Check out
-    const checkOutTime = timestamp || new Date().toISOString();
-    const checkInTime = new Date(activeSession.check_in);
-    const checkOutDate = new Date(checkOutTime);
-    const diff = checkOutDate - checkInTime;
-    const hours = Math.floor(diff / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const duration = `${hours}h ${minutes}m`;
+    if (activeSession) {
+      // Check out
+      const checkOutTime = timestamp || new Date().toISOString();
+      const checkInTime = new Date(activeSession.check_in);
+      const checkOutDate = new Date(checkOutTime);
+      const diff = checkOutDate - checkInTime;
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const duration = `${hours}h ${minutes}m`;
 
-    db.prepare('UPDATE checkins SET check_out = ?, duration = ? WHERE id = ?')
-      .run(checkOutTime, duration, activeSession.id);
+      await pool.query(
+        'UPDATE checkins SET check_out = $1, duration = $2 WHERE id = $3',
+        [checkOutTime, duration, activeSession.id]
+      );
 
-    console.log(`✓ ${user.name} checked out (${duration})`);
+      console.log(`✓ ${user.name} checked out (${duration})`);
 
-    res.json({
-      message: `${user.name} checked out`,
-      action: 'checkout',
-      user: user.name,
-      duration
-    });
-  } else {
-    // Check in
-    const checkInId = Date.now().toString();
-    const checkInTime = timestamp || new Date().toISOString();
+      res.json({
+        message: `${user.name} checked out`,
+        action: 'checkout',
+        user: user.name,
+        duration
+      });
+    } else {
+      // Check in
+      const checkInId = Date.now().toString();
+      const checkInTime = timestamp || new Date().toISOString();
 
-    db.prepare('INSERT INTO checkins (id, user_id, user_name, check_in) VALUES (?, ?, ?, ?)')
-      .run(checkInId, user.id, user.name, checkInTime);
+      await pool.query(
+        'INSERT INTO checkins (id, user_id, user_name, check_in) VALUES ($1, $2, $3, $4)',
+        [checkInId, user.id, user.name, checkInTime]
+      );
 
-    console.log(`✓ ${user.name} checked in`);
+      console.log(`✓ ${user.name} checked in`);
 
-    res.json({
-      message: `${user.name} checked in`,
-      action: 'checkin',
-      user: user.name
-    });
+      res.json({
+        message: `${user.name} checked in`,
+        action: 'checkin',
+        user: user.name
+      });
+    }
+  } catch (error) {
+    console.error('Check-in error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Get all users
-app.get('/api/users', (req, res) => {
-  const users = db.prepare('SELECT * FROM users ORDER BY created_at DESC').all();
-  res.json(users);
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Create user
-app.post('/api/users', (req, res) => {
+app.post('/api/users', async (req, res) => {
   const { name, email, card_id } = req.body;
 
   if (!name || !card_id) {
@@ -120,68 +152,104 @@ app.post('/api/users', (req, res) => {
   const created_at = new Date().toISOString();
 
   try {
-    db.prepare('INSERT INTO users (id, name, email, card_id, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(id, name, email || '', card_id, created_at);
+    await pool.query(
+      'INSERT INTO users (id, name, email, card_id, created_at) VALUES ($1, $2, $3, $4, $5)',
+      [id, name, email || '', card_id, created_at]
+    );
 
     console.log(`✓ New user created: ${name}`);
 
     res.json({ id, name, email, card_id, created_at });
   } catch (error) {
-    res.status(400).json({ error: 'Card ID already exists' });
+    if (error.code === '23505') { // Unique constraint violation
+      res.status(400).json({ error: 'Card ID already exists' });
+    } else {
+      console.error('Create user error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
   }
 });
 
 // Update user
-app.put('/api/users/:id', (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
   const { name, email, card_id } = req.body;
 
   try {
-    db.prepare('UPDATE users SET name = ?, email = ?, card_id = ? WHERE id = ?')
-      .run(name, email || '', card_id, req.params.id);
+    await pool.query(
+      'UPDATE users SET name = $1, email = $2, card_id = $3 WHERE id = $4',
+      [name, email || '', card_id, req.params.id]
+    );
 
     console.log(`✓ User updated: ${name}`);
 
     res.json({ id: req.params.id, name, email, card_id });
   } catch (error) {
-    res.status(400).json({ error: 'Card ID already exists or user not found' });
+    if (error.code === '23505') {
+      res.status(400).json({ error: 'Card ID already exists' });
+    } else {
+      console.error('Update user error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
   }
 });
 
 // Delete user
-app.delete('/api/users/:id', (req, res) => {
-  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
-  console.log(`✓ User deleted: ${req.params.id}`);
-  res.json({ success: true });
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    console.log(`✓ User deleted: ${req.params.id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Get all check-ins
-app.get('/api/checkins', (req, res) => {
-  const checkins = db.prepare('SELECT * FROM checkins ORDER BY check_in DESC').all();
-  res.json(checkins);
+app.get('/api/checkins', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM checkins ORDER BY check_in DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get check-ins error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Get currently checked in users
-app.get('/api/checkins/active', (req, res) => {
-  const active = db.prepare('SELECT * FROM checkins WHERE check_out IS NULL').all();
-  res.json(active);
+app.get('/api/checkins/active', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM checkins WHERE check_out IS NULL');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get active check-ins error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Get user statistics
-app.get('/api/users/:id/stats', (req, res) => {
-  const sessions = db.prepare(
-    'SELECT * FROM checkins WHERE user_id = ? AND check_out IS NOT NULL'
-  ).all(req.params.id);
+app.get('/api/users/:id/stats', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM checkins WHERE user_id = $1 AND check_out IS NOT NULL',
+      [req.params.id]
+    );
 
-  const totalMinutes = sessions.reduce((acc, session) => {
-    const diff = new Date(session.check_out) - new Date(session.check_in);
-    return acc + diff / 60000;
-  }, 0);
+    const sessions = result.rows;
+    const totalMinutes = sessions.reduce((acc, session) => {
+      const diff = new Date(session.check_out) - new Date(session.check_in);
+      return acc + diff / 60000;
+    }, 0);
 
-  res.json({
-    total_visits: sessions.length,
-    total_hours: Math.floor(totalMinutes / 60),
-    average_hours: sessions.length ? Math.floor(totalMinutes / 60 / sessions.length) : 0
-  });
+    res.json({
+      total_visits: sessions.length,
+      total_hours: Math.floor(totalMinutes / 60),
+      average_hours: sessions.length ? Math.floor(totalMinutes / 60 / sessions.length) : 0
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Serve static frontend files
@@ -198,6 +266,7 @@ app.listen(PORT, () => {
 ║   Coworking Check-in System                    ║
 ║   Server running on port ${PORT}                   ║
 ║                                                ║
+║   Database: PostgreSQL                         ║
 ║   Frontend: http://localhost:${PORT}              ║
 ║   API: http://localhost:${PORT}/api               ║
 ╚════════════════════════════════════════════════╝
