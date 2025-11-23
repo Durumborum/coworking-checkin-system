@@ -1,6 +1,7 @@
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect } = React;
+const { createRoot } = ReactDOM;
 
-// Base URL for API
+// Use backend URL from index.html or fall back to current origin
 const API_BASE_URL = window.API_BASE_URL || window.location.origin;
 
 function CoworkingApp() {
@@ -12,14 +13,10 @@ function CoworkingApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Date range for graph
-  const [fromDate, setFromDate] = useState(
-    new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]
-  );
-  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
-
-  const chartRef = useRef(null);
-  const [dailyChart, setDailyChart] = useState(null);
+  // Chart & date range state
+  const [chartStart, setChartStart] = useState('');
+  const [chartEnd, setChartEnd] = useState('');
+  const [dailyActiveData, setDailyActiveData] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -27,56 +24,53 @@ function CoworkingApp() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!loading) buildChart();
-  }, [checkIns, fromDate, toDate]);
-
   const loadData = async () => {
     try {
       const [usersRes, checkInsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/users`),
         fetch(`${API_BASE_URL}/api/checkins`)
       ]);
-
-      if (!usersRes.ok || !checkInsRes.ok) throw new Error('API request failed');
-
       const usersData = await usersRes.json();
       const checkInsData = await checkInsRes.json();
 
       setUsers(Array.isArray(usersData) ? usersData : []);
       setCheckIns(Array.isArray(checkInsData) ? checkInsData : []);
+      setLoading(false);
+      generateDailyActiveUsersChart(checkInsData);
       setError(null);
-      setLoading(false);
     } catch (err) {
-      console.error(err);
-      setError(err.message);
-      setUsers([]);
-      setCheckIns([]);
+      console.error('Error loading data:', err);
       setLoading(false);
+      setError('Failed to load data.');
     }
   };
 
-  // ---------------- USER MANAGEMENT ----------------
   const handleCheckIn = async (cardId) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/checkin`, {
+      const response = await fetch(`${API_BASE_URL}/api/checkin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ card_id: cardId })
       });
-      const result = await res.json();
-      if (res.ok) alert(result.message);
-      else alert(result.error || 'Error processing check-in');
-      loadData();
+      const result = await response.json();
+      if (response.ok) {
+        alert(result.message);
+        loadData();
+      } else {
+        alert(result.error || 'Error processing check-in');
+      }
     } catch (err) {
       alert('Network error: ' + err.message);
     }
   };
 
   const addUser = async () => {
-    if (!newUser.name || !newUser.cardId) return alert('Name and Card ID are required');
+    if (!newUser.name || !newUser.cardId) {
+      alert('Name and Card ID are required');
+      return;
+    }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users`, {
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,11 +79,11 @@ function CoworkingApp() {
           card_id: newUser.cardId
         })
       });
-      if (res.ok) {
+      if (response.ok) {
         setNewUser({ name: '', email: '', cardId: '' });
         loadData();
       } else {
-        const err = await res.json();
+        const err = await response.json();
         alert(err.error || 'Error adding user');
       }
     } catch (err) {
@@ -99,7 +93,7 @@ function CoworkingApp() {
 
   const updateUser = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,7 +102,7 @@ function CoworkingApp() {
           card_id: editingUser.card_id
         })
       });
-      if (res.ok) {
+      if (response.ok) {
         setEditingUser(null);
         loadData();
       }
@@ -120,165 +114,209 @@ function CoworkingApp() {
   const deleteUser = async (id) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
-      if (res.ok) loadData();
+      const response = await fetch(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
+      if (response.ok) loadData();
     } catch (err) {
       alert('Network error: ' + err.message);
     }
   };
 
-  // ---------------- HELPERS ----------------
   const getCurrentlyCheckedIn = () => checkIns.filter(c => !c.check_out);
   const getTodayCheckIns = () => {
     const today = new Date().toDateString();
     return checkIns.filter(c => new Date(c.check_in).toDateString() === today);
   };
 
-  const getUserStatsMonth = (userId) => {
+  const getUserStats = (userId) => {
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const userCheckIns = checkIns.filter(c => c.user_id === userId && c.check_out && new Date(c.check_in) >= monthStart);
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const userCheckIns = checkIns.filter(c => c.user_id === userId && c.check_out && new Date(c.check_in) >= firstDay);
     const totalMinutes = userCheckIns.reduce((acc, c) => acc + (new Date(c.check_out) - new Date(c.check_in)) / 60000, 0);
-    const uniqueDays = [...new Set(userCheckIns.map(c => new Date(c.check_in).toDateString()))];
+    const uniqueDays = [...new Set(userCheckIns.map(c => new Date(c.check_in).toDateString()))].length;
     return {
       checkIns: userCheckIns.length,
-      hoursSpent: Math.floor(totalMinutes / 60),
-      uniqueDays: uniqueDays.length
+      hours: Math.floor(totalMinutes / 60),
+      uniqueDays
     };
   };
 
-  // ---------------- CHART ----------------
-  const buildChart = () => {
-    const from = new Date(fromDate);
-    const to = new Date(toDate);
-
-    const dayMap = {};
-    for (let d = new Date(from); d <= to; d.setDate(d.getDate()+1)) {
-      const dayStr = d.toISOString().split('T')[0];
-      dayMap[dayStr] = 0;
+  const generateDailyActiveUsersChart = (checkInsData) => {
+    const end = chartEnd ? new Date(chartEnd) : new Date();
+    const start = chartStart ? new Date(chartStart) : new Date(end.getTime() - 29*24*60*60*1000);
+    const dailyCounts = {};
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      dailyCounts[d.toISOString().slice(0,10)] = 0;
     }
-
-    checkIns.forEach(c => {
-      const checkInDate = new Date(c.check_in);
-      if (checkInDate >= from && checkInDate <= to) {
-        const dayStr = checkInDate.toISOString().split('T')[0];
-        dayMap[dayStr] += 1;
-      }
+    checkInsData.forEach(c => {
+      const dateStr = new Date(c.check_in).toISOString().slice(0,10);
+      if (dateStr in dailyCounts) dailyCounts[dateStr]++;
     });
-
-    const labels = Object.keys(dayMap);
-    const data = Object.values(dayMap);
-
-    if (dailyChart) dailyChart.destroy();
-
-    const ctx = chartRef.current.getContext('2d');
-    const newChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Active Users',
-          data,
-          fill: false,
-          borderColor: '#ABAEA0',
-          backgroundColor: '#ABAEA0',
-          tension: 0.2
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-      }
-    });
-    setDailyChart(newChart);
+    setDailyActiveData(Object.entries(dailyCounts));
   };
 
-  // ---------------- LOADING / ERROR ----------------
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-black">Loading...</div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white font-quattrocento text-black">
+      <div>Loading...</div>
+    </div>
+  );
 
-  // ---------------- RENDER ----------------
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center bg-white font-quattrocento text-black">
+      <div>{error}</div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-white text-black font-quattrocento">
-      <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold mb-2"><img src="rami_logo_new.avif" alt="Rami Ceramics" className="inline h-12"/> Coworking Studio</h1>
-          <p className="text-secondary">Check-in/out Management System</p>
+    <div className="min-h-screen font-quattrocento text-black bg-white">
+      <div className="container mx-auto p-6">
+        <header className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Rami Ceramics Coworking</h1>
+          <p className="text-secondary">Check-in/out Management</p>
         </header>
 
         <div className="flex gap-4 mb-6 flex-wrap">
-          {['dashboard', 'users', 'history', 'simulator'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === tab ? 'bg-black text-white' : 'bg-white text-black hover:text-secondary'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          {['dashboard','users','history','simulator'].map(tab => (
+            <button key={tab} onClick={()=>setActiveTab(tab)}
+              className={`px-4 py-2 rounded ${activeTab===tab?'bg-black text-white':'bg-white text-black hover:text-secondary hover:border-secondary border border-black'}`}>
+              {tab.charAt(0).toUpperCase()+tab.slice(1)}
             </button>
           ))}
         </div>
 
-        {/* ---------------- TABS ---------------- */}
-        {activeTab === 'dashboard' && (
+        {/* --- DASHBOARD --- */}
+        {activeTab==='dashboard' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 border rounded shadow">
+              <p>Currently In</p>
+              <p className="text-2xl font-bold">{getCurrentlyCheckedIn().length}</p>
+            </div>
+            <div className="p-4 border rounded shadow">
+              <p>Today's Check-ins</p>
+              <p className="text-2xl font-bold">{getTodayCheckIns().length}</p>
+            </div>
+            <div className="p-4 border rounded shadow">
+              <p>Total Users</p>
+              <p className="text-2xl font-bold">{users.length}</p>
+            </div>
+          </div>
+        )}
+
+        {/* --- USERS --- */}
+        {activeTab==='users' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl p-6 shadow-lg border">
-                <p className="text-gray-600 text-sm">Currently In</p>
-                <p className="text-3xl font-bold">{getCurrentlyCheckedIn().length}</p>
+            <div className="p-4 border rounded shadow">
+              <h2 className="font-bold mb-2">Add New User</h2>
+              <div className="flex gap-2 flex-wrap">
+                <input placeholder="Name" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})}
+                  className="border px-2 py-1"/>
+                <input placeholder="Email" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})}
+                  className="border px-2 py-1"/>
+                <input placeholder="Card ID" value={newUser.cardId} onChange={e=>setNewUser({...newUser,cardId:e.target.value})}
+                  className="border px-2 py-1"/>
+                <button onClick={addUser} className="bg-black text-white px-4 py-1 rounded">Add</button>
               </div>
-              <div className="bg-white rounded-xl p-6 shadow-lg border">
-                <p className="text-gray-600 text-sm">Today's Check-ins</p>
-                <p className="text-3xl font-bold text-green-600">{getTodayCheckIns().length}</p>
+            </div>
+            <div className="p-4 border rounded shadow">
+              <h2 className="font-bold mb-2">Registered Users</h2>
+              {users.map(u=>(
+                <div key={u.id} className="border-b py-2 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{u.name}</p>
+                    <p className="text-sm">{u.email}</p>
+                    <p className="text-xs">Card: {u.card_id}</p>
+                    <p className="text-xs text-secondary">
+                      {(()=>{const stats=getUserStats(u.id); return `${stats.checkIns} check-ins • ${stats.hours}h • ${stats.uniqueDays} unique days`})()}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={()=>setEditingUser(u)} className="text-secondary">✏️</button>
+                    <button onClick={()=>deleteUser(u.id)} className="text-red-600">🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- HISTORY --- */}
+        {activeTab==='history' && (
+          <div className="space-y-6">
+            <div className="p-4 border rounded shadow">
+              <h2 className="font-bold mb-2">Check-in/out History</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1">User</th>
+                      <th className="border px-2 py-1">Check In</th>
+                      <th className="border px-2 py-1">Check Out</th>
+                      <th className="border px-2 py-1">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {checkIns.slice().reverse().map(c=>(
+                      <tr key={c.id}>
+                        <td className="border px-2 py-1">{c.user_name}</td>
+                        <td className="border px-2 py-1">{new Date(c.check_in).toLocaleString()}</td>
+                        <td className="border px-2 py-1">{c.check_out?new Date(c.check_out).toLocaleString():'✅ In'}</td>
+                        <td className="border px-2 py-1">{c.duration||'-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="bg-white rounded-xl p-6 shadow-lg border">
-                <p className="text-gray-600 text-sm">Total Users</p>
-                <p className="text-3xl font-bold text-purple-600">{users.length}</p>
+            </div>
+            <div className="p-4 border rounded shadow">
+              <h2 className="font-bold mb-2">Daily Active Users (Last 30 Days)</h2>
+              <div className="flex gap-2 mb-2">
+                <input type="date" value={chartStart} onChange={e=>setChartStart(e.target.value)} className="border px-2 py-1"/>
+                <input type="date" value={chartEnd} onChange={e=>setChartEnd(e.target.value)} className="border px-2 py-1"/>
+                <button className="px-2 py-1 bg-black text-white rounded" onClick={()=>generateDailyActiveUsersChart(checkIns)}>Update</button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1">Date</th>
+                      <th className="border px-2 py-1">Active Users</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyActiveData.map(([date,count])=>(
+                      <tr key={date}>
+                        <td className="border px-2 py-1">{date}</td>
+                        <td className="border px-2 py-1">{count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'history' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl p-6 shadow-lg border">
-              <h2 className="text-xl font-bold mb-4">📊 Daily Active Users</h2>
-              <div className="flex gap-4 mb-4 flex-wrap">
-                <div>
-                  <label>From: </label>
-                  <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="border px-2 py-1 rounded"/>
-                </div>
-                <div>
-                  <label>To: </label>
-                  <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="border px-2 py-1 rounded"/>
-                </div>
-              </div>
-              <canvas ref={chartRef}></canvas>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-lg border">
-              <h2 className="text-xl font-bold mb-4">📋 Monthly Usage Per User</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {users.map(user => {
-                  const stats = getUserStatsMonth(user.id);
-                  return (
-                    <div key={user.id} className="border rounded-lg p-4 bg-gray-50">
-                      <p className="font-semibold">{user.name}</p>
-                      <p>Check-ins: {stats.checkIns}</p>
-                      <p>Hours spent: {stats.hoursSpent}</p>
-                      <p>Unique days: {stats.uniqueDays}</p>
-                    </div>
-                  );
-                })}
-              </div>
+        {/* --- SIMULATOR --- */}
+        {activeTab==='simulator' && (
+          <div className="p-4 border rounded shadow">
+            <h2 className="font-bold mb-2">NFC Simulator</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              {users.map(u=>(
+                <button key={u.id} onClick={()=>handleCheckIn(u.card_id)}
+                  className="p-2 border rounded hover:bg-secondary transition-colors">
+                  <p>{u.name}</p>
+                  <p className="text-xs">Card: {u.card_id}</p>
+                </button>
+              ))}
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
 }
 
-ReactDOM.render(<CoworkingApp />, document.getElementById('root'));
+// React 18 createRoot API
+const rootElement = document.getElementById('root');
+const root = createRoot(rootElement);
+root.render(<CoworkingApp />);
