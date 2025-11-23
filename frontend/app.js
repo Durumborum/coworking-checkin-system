@@ -1,12 +1,6 @@
-// Save this as frontend/app.js
-// This version connects to your backend API instead of using storage
-
 const { useState, useEffect } = React;
-const { Users, Clock, TrendingUp, UserPlus, Edit2, Trash2, Save, X } = window.lucide;
 
-// Change this to your Railway API URL if testing separately
-const API_BASE_URL = window.location.origin; // Uses same server
-// Or hardcode: const API_BASE_URL = 'https://your-app.railway.app';
+const API_BASE_URL = window.location.origin;
 
 function CoworkingApp() {
   const [users, setUsers] = useState([]);
@@ -18,7 +12,6 @@ function CoworkingApp() {
 
   useEffect(() => {
     loadData();
-    // Refresh data every 10 seconds
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -167,7 +160,7 @@ function CoworkingApp() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
-          <h1 className="text-4xl font-bold text-indigo-900 mb-2">Coworking Studio</h1>
+          <h1 className="text-4xl font-bold text-indigo-900 mb-2">🏢 Coworking Studio</h1>
           <p className="text-indigo-600">Check-in/out Management System</p>
         </header>
 
@@ -196,7 +189,7 @@ function CoworkingApp() {
                     <p className="text-gray-600 text-sm">Currently In</p>
                     <p className="text-3xl font-bold text-indigo-600">{getCurrentlyCheckedIn().length}</p>
                   </div>
-                  <Users className="w-12 h-12 text-indigo-400" />
+                  <div className="text-4xl">👥</div>
                 </div>
               </div>
 
@@ -206,7 +199,7 @@ function CoworkingApp() {
                     <p className="text-gray-600 text-sm">Today's Check-ins</p>
                     <p className="text-3xl font-bold text-green-600">{getTodayCheckIns().length}</p>
                   </div>
-                  <TrendingUp className="w-12 h-12 text-green-400" />
+                  <div className="text-4xl">📈</div>
                 </div>
               </div>
 
@@ -216,16 +209,13 @@ function CoworkingApp() {
                     <p className="text-gray-600 text-sm">Total Users</p>
                     <p className="text-3xl font-bold text-purple-600">{users.length}</p>
                   </div>
-                  <UserPlus className="w-12 h-12 text-purple-400" />
+                  <div className="text-4xl">👤</div>
                 </div>
               </div>
             </div>
 
             <div className="bg-white rounded-xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Clock className="w-6 h-6" />
-                Currently Checked In
-              </h2>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">⏰ Currently Checked In</h2>
               {getCurrentlyCheckedIn().length === 0 ? (
                 <p className="text-gray-500">No one is currently checked in</p>
               ) : (
@@ -250,7 +240,7 @@ function CoworkingApp() {
         {activeTab === 'users' && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Add New User</h2>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">➕ Add New User</h2>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <input
                   type="text"
@@ -275,16 +265,15 @@ function CoworkingApp() {
                 />
                 <button
                   onClick={addUser}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                  <UserPlus className="w-5 h-5" />
                   Add User
                 </button>
               </div>
             </div>
 
             <div className="bg-white rounded-xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Registered Users</h2>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">📋 Registered Users</h2>
               <div className="space-y-3">
                 {users.map(user => (
                   <div key={user.id} className="p-4 border border-gray-200 rounded-lg hover:border-indigo-300 transition-colors">
@@ -311,16 +300,15 @@ function CoworkingApp() {
                         <div className="flex gap-2">
                           <button
                             onClick={updateUser}
-                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-1"
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                           >
-                            <Save className="w-4 h-4" />
-                            Save
+                            💾 Save
                           </button>
                           <button
                             onClick={() => setEditingUser(null)}
                             className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                           >
-                            <X className="w-4 h-4" />
+                            ✖
                           </button>
                         </div>
                       </div>
@@ -342,21 +330,24 @@ function CoworkingApp() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => setEditingUser(user)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           >
-                            <Edit2 className="w-5 h-5" />
+                            ✏️
                           </button>
                           <button
                             onClick={() => deleteUser(user.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            🗑️
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
                 ))}
+                {users.length === 0 && (
+                  <p className="text-gray-500 text-center py-4">No users registered yet. Add your first user above!</p>
+                )}
               </div>
             </div>
           </div>
@@ -364,7 +355,7 @@ function CoworkingApp() {
 
         {activeTab === 'history' && (
           <div className="bg-white rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Check-in/out History</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">📊 Check-in/out History</h2>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -382,12 +373,17 @@ function CoworkingApp() {
                       <td className="py-3 px-4">{new Date(session.check_in).toLocaleString()}</td>
                       <td className="py-3 px-4">
                         {session.check_out ? new Date(session.check_out).toLocaleString() : 
-                          <span className="text-green-600 font-semibold">Currently In</span>
+                          <span className="text-green-600 font-semibold">Currently In ✅</span>
                         }
                       </td>
                       <td className="py-3 px-4">{session.duration || '-'}</td>
                     </tr>
                   ))}
+                  {checkIns.length === 0 && (
+                    <tr>
+                      <td colSpan="4" className="text-center py-4 text-gray-500">No check-in history yet</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -396,7 +392,7 @@ function CoworkingApp() {
 
         {activeTab === 'simulator' && (
           <div className="bg-white rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">NFC Card Simulator</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">🎮 NFC Card Simulator</h2>
             <p className="text-gray-600 mb-6">
               Simulate NFC card taps for testing (in production, your Raspberry Pi will call the API)
             </p>
@@ -407,16 +403,19 @@ function CoworkingApp() {
                   onClick={() => handleCheckIn(user.card_id)}
                   className="p-6 border-2 border-indigo-300 rounded-lg hover:bg-indigo-50 transition-colors text-left"
                 >
-                  <p className="font-semibold text-gray-800">{user.name}</p>
+                  <p className="font-semibold text-gray-800">👤 {user.name}</p>
                   <p className="text-sm text-gray-600 mt-1">Card: {user.card_id}</p>
                   <p className="text-xs text-indigo-600 mt-2">
                     {checkIns.find(c => c.user_id === user.id && !c.check_out) ? 
-                      '✓ Currently checked in' : 
-                      '○ Not checked in'
+                      '✅ Currently checked in' : 
+                      '⭕ Not checked in'
                     }
                   </p>
                 </button>
               ))}
+              {users.length === 0 && (
+                <p className="text-gray-500 col-span-3 text-center py-4">Add users first to simulate check-ins</p>
+              )}
             </div>
           </div>
         )}
