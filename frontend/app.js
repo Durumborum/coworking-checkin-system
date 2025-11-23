@@ -1,7 +1,6 @@
 const { useState, useEffect } = React;
 const { createRoot } = ReactDOM;
 
-// Use backend URL from index.html or fall back to current origin
 const API_BASE_URL = window.API_BASE_URL || window.location.origin;
 
 function CoworkingApp() {
@@ -13,7 +12,6 @@ function CoworkingApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Chart & date range state
   const [chartStart, setChartStart] = useState('');
   const [chartEnd, setChartEnd] = useState('');
   const [dailyActiveData, setDailyActiveData] = useState([]);
@@ -85,26 +83,6 @@ function CoworkingApp() {
       } else {
         const err = await response.json();
         alert(err.error || 'Error adding user');
-      }
-    } catch (err) {
-      alert('Network error: ' + err.message);
-    }
-  };
-
-  const updateUser = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editingUser.name,
-          email: editingUser.email,
-          card_id: editingUser.card_id
-        })
-      });
-      if (response.ok) {
-        setEditingUser(null);
-        loadData();
       }
     } catch (err) {
       alert('Network error: ' + err.message);
@@ -211,6 +189,7 @@ function CoworkingApp() {
         {/* --- USERS --- */}
         {activeTab==='users' && (
           <div className="space-y-6">
+            {/* Add New User */}
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Add New User</h2>
               <div className="flex gap-2 flex-wrap">
@@ -223,120 +202,59 @@ function CoworkingApp() {
                 <button onClick={addUser} className="bg-black text-white px-4 py-1 rounded">Add</button>
               </div>
             </div>
+
+            {/* Registered Users */}
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Registered Users</h2>
-              {users.map(u=>(
-                <div key={u.id} className="border-b py-2 flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{u.name}</p>
-                    <p className="text-sm">{u.email}</p>
-                    <p className="text-xs">Card: {u.card_id}</p>
-                    <p className="text-xs text-secondary">
-                      {(()=>{const stats=getUserStats(u.id); return `${stats.checkIns} check-ins • ${stats.hours}h • ${stats.uniqueDays} unique days`})()}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={()=>setEditingUser(u)} className="text-secondary">✏️</button>
-                    <button onClick={()=>deleteUser(u.id)} className="text-red-600">🗑️</button>
-                  </div>
-                </div>
-              ))}
+              <div className="space-y-3">
+                {users.length===0 && <p className="text-center text-secondary py-4">No users registered yet.</p>}
+                {users.map(user => {
+                  const stats = getUserStats(user.id);
+                  return (
+                    <div key={user.id} className="p-4 border border-secondary rounded">
+                      {editingUser?.id === user.id ? (
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                          <input type="text" value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="px-3 py-2 border rounded"/>
+                          <input type="email" value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="px-3 py-2 border rounded"/>
+                          <input type="text" value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="px-3 py-2 border rounded"/>
+                          <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:parseInt(e.target.value)||0})} className="px-3 py-2 border rounded"/>
+                          <div className="flex gap-2">
+                            <button onClick={async ()=>{
+                              try {
+                                const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+                                  method:'PUT',
+                                  headers:{'Content-Type':'application/json'},
+                                  body:JSON.stringify(editingUser)
+                                });
+                                if(!res.ok){const err=await res.json();alert(err.error||'Failed to save user');}
+                                else {setEditingUser(null); loadData();}
+                              } catch(err){alert('Network error: '+err.message);}
+                            }} className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">💾 Save</button>
+                            <button onClick={()=>setEditingUser(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">✖</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold">{user.name}</p>
+                            <p className="text-sm">{user.email}</p>
+                            <p className="text-xs">Card ID: {user.card_id}</p>
+                            <p className="text-xs">Included Hours: {user.included_hours}h</p>
+                            <p className="text-xs text-secondary">{stats.checkIns} visits • {stats.hours}h • {stats.uniqueDays} days</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={()=>setEditingUser(user)} className="px-4 py-2 text-blue-600 rounded">✏️</button>
+                            <button onClick={()=>deleteUser(user.id)} className="px-4 py-2 text-red-600 rounded">🗑️</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
-
-        {/* List Users */}
-<div className="bg-white rounded-xl p-6 shadow-lg border border-secondary">
-  <h2 className="text-xl font-bold mb-4">📋 Registered Users</h2>
-  <div className="space-y-3">
-    {users.map(user => (
-      <div key={user.id} className="p-4 border border-secondary rounded">
-        {editingUser?.id === user.id ? (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <input
-              type="text"
-              value={editingUser.name}
-              onChange={e => setEditingUser({...editingUser, name: e.target.value})}
-              className="px-3 py-2 border rounded"
-            />
-            <input
-              type="email"
-              value={editingUser.email}
-              onChange={e => setEditingUser({...editingUser, email: e.target.value})}
-              className="px-3 py-2 border rounded"
-            />
-            <input
-              type="text"
-              value={editingUser.card_id}
-              onChange={e => setEditingUser({...editingUser, card_id: e.target.value})}
-              className="px-3 py-2 border rounded"
-            />
-            <input
-              type="number"
-              value={editingUser.included_hours}
-              onChange={e => setEditingUser({...editingUser, included_hours: parseInt(e.target.value)||0})}
-              className="px-3 py-2 border rounded"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        name: editingUser.name,
-                        email: editingUser.email,
-                        card_id: editingUser.card_id,
-                        included_hours: editingUser.included_hours
-                      })
-                    });
-                    if (!res.ok) {
-                      const error = await res.json();
-                      alert(error.error || 'Failed to save user');
-                    } else {
-                      setEditingUser(null);
-                      loadData();
-                    }
-                  } catch (err) {
-                    alert('Network error: ' + err.message);
-                  }
-                }}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                💾 Save
-              </button>
-              <button
-                onClick={()=>setEditingUser(null)}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-              >
-                ✖
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold">{user.name}</p>
-              <p className="text-sm">{user.email}</p>
-              <p className="text-xs">Card ID: {user.card_id}</p>
-              <p className="text-xs">Included Hours: {user.included_hours}h</p>
-              {(() => {
-                const stats = getUserStats(user.id);
-                return <p className="text-xs text-secondary">{stats.totalVisits} visits • {stats.totalHours}h total</p>
-              })()}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={()=>setEditingUser(user)} className="px-4 py-2 text-blue-600 rounded">✏️</button>
-              <button onClick={()=>deleteUser(user.id)} className="px-4 py-2 text-red-600 rounded">🗑️</button>
-            </div>
-          </div>
-        )}
-      </div>
-    ))}
-    {users.length===0 && <p className="text-center text-secondary py-4">No users registered yet.</p>}
-  </div>
-</div>
 
         {/* --- HISTORY --- */}
         {activeTab==='history' && (
@@ -402,7 +320,7 @@ function CoworkingApp() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {users.map(u=>(
                 <button key={u.id} onClick={()=>handleCheckIn(u.card_id)}
-                  className="p-2 border rounded hover:bg-secondary transition-colors">
+                  className="p-2 border rounded transition-colors">
                   <p>{u.name}</p>
                   <p className="text-xs">Card: {u.card_id}</p>
                 </button>
