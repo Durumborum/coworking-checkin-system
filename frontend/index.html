@@ -3,17 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <title>Coworking Check-in System</title>
+
     <script defer src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script defer src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss/dist/tailwind.min.css"/>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Quattrocento+Sans:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      body {
+        font-family: 'Quattrocento Sans', sans-serif;
+      }
+    </style>
   </head>
+
   <body class="bg-white text-black">
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
-      import App from "./src/App.js";
+    <!-- Load components in order -->
+    <script type="text/babel" data-presets="env,react" src="src/components/Dashboard.js"></script>
+    <script type="text/babel" data-presets="env,react" src="src/components/Users.js"></script>
+    <script type="text/babel" data-presets="env,react" src="src/components/History.js"></script>
+    <script type="text/babel" data-presets="env,react" src="src/components/Simulator.js"></script>
 
+    <!-- Hooks -->
+    <script type="text/babel" data-presets="env,react" src="src/hooks/useUsers.js"></script>
+    <script type="text/babel" data-presets="env,react" src="src/hooks/useCheckIns.js"></script>
+
+    <!-- Config -->
+    <script type="text/babel" src="src/config.js"></script>
+
+    <!-- Finally, the main App -->
+    <script type="text/babel" data-presets="env,react" src="src/app.js"></script>
+
+    <!-- Mount React App -->
+    <script type="text/babel" data-presets="env,react">
       const root = ReactDOM.createRoot(document.getElementById("root"));
       root.render(<App />);
     </script>
