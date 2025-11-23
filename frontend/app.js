@@ -291,33 +291,78 @@ function CoworkingApp() {
 
         {/* History Tab */}
         {activeTab === 'history' && (
-          <div className="bg-white rounded-xl p-6 shadow border border-secondary">
-            <h2 className="text-xl font-bold text-black mb-4">📊 Check-in/out History</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-secondary">
-                    <th className="text-left py-3 px-4 text-secondary font-semibold">User</th>
-                    <th className="text-left py-3 px-4 text-secondary font-semibold">Check In</th>
-                    <th className="text-left py-3 px-4 text-secondary font-semibold">Check Out</th>
-                    <th className="text-left py-3 px-4 text-secondary font-semibold">Duration</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {checkIns.slice().reverse().map(session => (
-                    <tr key={session.id} className="border-b border-secondary hover:bg-secondary/10">
-                      <td className="py-3 px-4">{session.user_name}</td>
-                      <td className="py-3 px-4">{new Date(session.check_in).toLocaleString()}</td>
-                      <td className="py-3 px-4">{session.check_out ? new Date(session.check_out).toLocaleString() : <span className="text-secondary font-semibold">Currently In ✅</span>}</td>
-                      <td className="py-3 px-4">{session.duration || '-'}</td>
-                    </tr>
-                  ))}
-                  {checkIns.length === 0 && <tr><td colSpan="4" className="text-center py-4 text-secondary">No check-in history yet</td></tr>}
-                </tbody>
-              </table>
+  <div className="space-y-6">
+    {/* Check-in/out History Table */}
+    <div className="bg-white rounded-xl p-6 shadow border border-secondary">
+      <h2 className="text-xl font-bold text-black mb-4">📊 Check-in/out History</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-secondary">
+              <th className="text-left py-3 px-4 text-secondary font-semibold">User</th>
+              <th className="text-left py-3 px-4 text-secondary font-semibold">Check In</th>
+              <th className="text-left py-3 px-4 text-secondary font-semibold">Check Out</th>
+              <th className="text-left py-3 px-4 text-secondary font-semibold">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            {checkIns.slice().reverse().map(session => (
+              <tr key={session.id} className="border-b border-secondary hover:bg-secondary/10">
+                <td className="py-3 px-4">{session.user_name}</td>
+                <td className="py-3 px-4">{new Date(session.check_in).toLocaleString()}</td>
+                <td className="py-3 px-4">{session.check_out ? new Date(session.check_out).toLocaleString() : <span className="text-secondary font-semibold">Currently In ✅</span>}</td>
+                <td className="py-3 px-4">{session.duration || '-'}</td>
+              </tr>
+            ))}
+            {checkIns.length === 0 && <tr><td colSpan="4" className="text-center py-4 text-secondary">No check-in history yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {/* Daily Active Users Graph */}
+    <div className="bg-white rounded-xl p-6 shadow border border-secondary">
+      <h2 className="text-xl font-bold text-black mb-4">📈 Daily Active Users (Last 30 Days)</h2>
+      <div className="mb-4 flex gap-4 items-center">
+        <label className="text-secondary font-semibold">From:</label>
+        <input type="date" className="border border-secondary rounded px-2 py-1" id="fromDate" />
+        <label className="text-secondary font-semibold">To:</label>
+        <input type="date" className="border border-secondary rounded px-2 py-1" id="toDate" />
+        <button className="px-4 py-2 bg-secondary text-white rounded hover:bg-secondary/80" onClick={() => updateGraph()}>Update</button>
+      </div>
+      <canvas id="dailyActiveUsersChart"></canvas>
+    </div>
+
+    {/* Monthly User Summary */}
+    <div className="bg-white rounded-xl p-6 shadow border border-secondary">
+      <h2 className="text-xl font-bold text-black mb-4">🧑‍🤝‍🧑 Monthly User Summary</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {users.map(user => {
+          // Filter check-ins for current month
+          const now = new Date();
+          const monthlyCheckIns = checkIns.filter(c => c.user_id === user.id && new Date(c.check_in).getMonth() === now.getMonth() && new Date(c.check_in).getFullYear() === now.getFullYear());
+          
+          const totalHours = monthlyCheckIns.reduce((acc, c) => {
+            if (c.check_out) return acc + (new Date(c.check_out) - new Date(c.check_in)) / 3600000;
+            return acc;
+          }, 0);
+
+          const uniqueDays = [...new Set(monthlyCheckIns.map(c => new Date(c.check_in).toDateString()))];
+
+          return (
+            <div key={user.id} className="bg-secondary/10 p-4 rounded-lg">
+              <p className="font-semibold text-black">{user.name}</p>
+              <p className="text-secondary text-sm">Check-ins: {monthlyCheckIns.length}</p>
+              <p className="text-secondary text-sm">Hours: {totalHours.toFixed(2)}</p>
+              <p className="text-secondary text-sm">Unique Days: {uniqueDays.length}</p>
             </div>
-          </div>
-        )}
+          );
+        })}
+      </div>
+    </div>
+  </div>
+)}
+
 
         {/* Simulator Tab */}
         {activeTab === 'simulator' && (
