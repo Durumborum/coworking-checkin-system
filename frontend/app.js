@@ -1,6 +1,7 @@
 const { useState, useEffect } = React;
 const { createRoot } = ReactDOM;
 
+// Use backend URL from index.html or fall back to current origin
 const API_BASE_URL = window.API_BASE_URL || window.location.origin;
 
 function CoworkingApp() {
@@ -8,7 +9,7 @@ function CoworkingApp() {
   const [checkIns, setCheckIns] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [editingUser, setEditingUser] = useState(null);
-  const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '', included_hours: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -74,15 +75,16 @@ function CoworkingApp() {
         body: JSON.stringify({
           name: newUser.name,
           email: newUser.email,
-          card_id: newUser.cardId
+          card_id: newUser.cardId,
+          included_hours: newUser.included_hours ?? 0
         })
       });
-      if (response.ok) {
-        setNewUser({ name: '', email: '', cardId: '' });
-        loadData();
-      } else {
+      if (!response.ok) {
         const err = await response.json();
-        alert(err.error || 'Error adding user');
+        alert(err.error || 'Failed to add user');
+      } else {
+        setNewUser({ name: '', email: '', cardId: '', included_hours: 0 });
+        loadData();
       }
     } catch (err) {
       alert('Network error: ' + err.message);
@@ -105,16 +107,26 @@ function CoworkingApp() {
     return checkIns.filter(c => new Date(c.check_in).toDateString() === today);
   };
 
-  const getUserStats = (userId) => {
+  // Returns user stats including hours used vs included_hours
+  const getUserStats = (user) => {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const userCheckIns = checkIns.filter(c => c.user_id === userId && c.check_out && new Date(c.check_in) >= firstDay);
+    const userCheckIns = checkIns.filter(c => c.user_id === user.id && c.check_out && new Date(c.check_in) >= firstDay);
     const totalMinutes = userCheckIns.reduce((acc, c) => acc + (new Date(c.check_out) - new Date(c.check_in)) / 60000, 0);
+    const totalHours = Math.floor(totalMinutes / 60);
     const uniqueDays = [...new Set(userCheckIns.map(c => new Date(c.check_in).toDateString()))].length;
+
+    let status = '';
+    if (user.included_hours > 0) {
+      if (totalHours >= user.included_hours) status = '⚠ Over limit';
+      else if (totalHours >= user.included_hours * 0.8) status = '⚠ Approaching limit';
+    }
+
     return {
       checkIns: userCheckIns.length,
-      hours: Math.floor(totalMinutes / 60),
-      uniqueDays
+      hours: totalHours,
+      uniqueDays,
+      status
     };
   };
 
@@ -148,11 +160,7 @@ function CoworkingApp() {
     <div className="min-h-screen font-quattrocento text-black bg-white">
       <div className="container mx-auto p-6">
         <header className="mb-6 flex items-center gap-4">
-          <img 
-            src="rami_logo_new.avif" 
-            alt="Rami Ceramics Logo" 
-            className="h-12 w-auto object-contain"
-          />
+          <img src="rami_logo_new.avif" alt="Rami Ceramics Logo" className="h-12 w-auto object-contain"/>
           <div>
             <h1 className="text-3xl font-bold mb-1">Rami Ceramics Coworking</h1>
             <p className="text-secondary">Check-in/out Management</p>
@@ -193,12 +201,10 @@ function CoworkingApp() {
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Add New User</h2>
               <div className="flex gap-2 flex-wrap">
-                <input placeholder="Name" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})}
-                  className="border px-2 py-1"/>
-                <input placeholder="Email" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})}
-                  className="border px-2 py-1"/>
-                <input placeholder="Card ID" value={newUser.cardId} onChange={e=>setNewUser({...newUser,cardId:e.target.value})}
-                  className="border px-2 py-1"/>
+                <input placeholder="Name" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})} className="border px-2 py-1"/>
+                <input placeholder="Email" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})} className="border px-2 py-1"/>
+                <input placeholder="Card ID" value={newUser.cardId} onChange={e=>setNewUser({...newUser,cardId:e.target.value})} className="border px-2 py-1"/>
+                <input type="number" placeholder="Included Hours" value={newUser.included_hours} onChange={e=>setNewUser({...newUser,included_hours:parseInt(e.target.value)||0})} className="border px-2 py-1"/>
                 <button onClick={addUser} className="bg-black text-white px-4 py-1 rounded">Add</button>
               </div>
             </div>
@@ -206,52 +212,62 @@ function CoworkingApp() {
             {/* Registered Users */}
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Registered Users</h2>
-              <div className="space-y-3">
-                {users.length===0 && <p className="text-center text-secondary py-4">No users registered yet.</p>}
-                {users.map(user => {
-                  const stats = getUserStats(user.id);
-                  return (
-                    <div key={user.id} className="p-4 border border-secondary rounded">
-                      {editingUser?.id === user.id ? (
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                          <input type="text" value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="px-3 py-2 border rounded"/>
-                          <input type="email" value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="px-3 py-2 border rounded"/>
-                          <input type="text" value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="px-3 py-2 border rounded"/>
-                          <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:parseInt(e.target.value)||0})} className="px-3 py-2 border rounded"/>
-                          <div className="flex gap-2">
-                            <button onClick={async ()=>{
-                              try {
-                                const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
-                                  method:'PUT',
-                                  headers:{'Content-Type':'application/json'},
-                                  body:JSON.stringify(editingUser)
-                                });
-                                if(!res.ok){const err=await res.json();alert(err.error||'Failed to save user');}
-                                else {setEditingUser(null); loadData();}
-                              } catch(err){alert('Network error: '+err.message);}
-                            }} className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">💾 Save</button>
-                            <button onClick={()=>setEditingUser(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">✖</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold">{user.name}</p>
-                            <p className="text-sm">{user.email}</p>
-                            <p className="text-xs">Card ID: {user.card_id}</p>
-                            <p className="text-xs">Included Hours: {user.included_hours}h</p>
-                            <p className="text-xs text-secondary">{stats.checkIns} visits • {stats.hours}h • {stats.uniqueDays} days</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={()=>setEditingUser(user)} className="px-4 py-2 text-blue-600 rounded">✏️</button>
-                            <button onClick={()=>deleteUser(user.id)} className="px-4 py-2 text-red-600 rounded">🗑️</button>
-                          </div>
-                        </div>
-                      )}
+              {users.map(user => (
+                <div key={user.id} className="p-4 border border-secondary rounded mb-2">
+                  {editingUser?.id === user.id ? (
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                      <input type="text" value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="px-3 py-2 border rounded"/>
+                      <input type="email" value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="px-3 py-2 border rounded"/>
+                      <input type="text" value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="px-3 py-2 border rounded"/>
+                      <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:parseInt(e.target.value)||0})} className="px-3 py-2 border rounded"/>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(editingUser)
+                              });
+                              if (!res.ok) {
+                                const err = await res.json();
+                                alert(err.error || 'Failed to save user');
+                              } else {
+                                setEditingUser(null);
+                                loadData();
+                              }
+                            } catch (err) {
+                              alert('Network error: ' + err.message);
+                            }
+                          }}
+                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                        >
+                          💾 Save
+                        </button>
+                        <button onClick={()=>setEditingUser(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">✖</button>
+                      </div>
                     </div>
-                  )
-                })}
-              </div>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">{user.name}</p>
+                        <p className="text-sm">{user.email}</p>
+                        <p className="text-xs">Card ID: {user.card_id}</p>
+                        <p className="text-xs">Included Hours: {user.included_hours}h</p>
+                        {(() => {
+                          const stats = getUserStats(user);
+                          return <p className={`text-xs text-secondary ${stats.status ? 'text-red-600 font-bold' : ''}`}>{stats.checkIns} visits • {stats.hours}h used • {stats.uniqueDays} days {stats.status}</p>
+                        })()}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={()=>setEditingUser(user)} className="px-4 py-2 text-blue-600 rounded">✏️</button>
+                        <button onClick={()=>deleteUser(user.id)} className="px-4 py-2 text-red-600 rounded">🗑️</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {users.length===0 && <p className="text-center text-secondary py-4">No users registered yet.</p>}
             </div>
           </div>
         )}
@@ -320,7 +336,7 @@ function CoworkingApp() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {users.map(u=>(
                 <button key={u.id} onClick={()=>handleCheckIn(u.card_id)}
-                  className="p-2 border rounded transition-colors">
+                  className="p-2 border rounded hover:bg-secondary transition-colors">
                   <p>{u.name}</p>
                   <p className="text-xs">Card: {u.card_id}</p>
                 </button>
