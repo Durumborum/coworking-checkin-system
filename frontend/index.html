@@ -5,26 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rami Ceramics Coworking Check-in System</title>
 
-  <!-- Google Font -->
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Quattrocento+Sans:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS with custom config -->
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
-            primary: '#000000',
-            secondary: '#ABAEA0'
+            primary: '#000000',        // Main black background
+            secondary: '#ABAEA0',      // Text and accent color
           },
           fontFamily: {
-            quattrocento: ['"Quattrocento Sans"', 'sans-serif']
-          }
+            quattrocento: ['"Quattrocento Sans"', 'sans-serif'],
+          },
         }
       }
     }
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -33,7 +33,7 @@
   <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="font-quattrocento bg-primary text-secondary">
+<body class="bg-primary text-secondary font-quattrocento">
   <div id="root"></div>
 
   <!-- App JS -->
