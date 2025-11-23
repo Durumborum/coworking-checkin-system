@@ -1,25 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coworking Check-in System</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coworking Check-in System</title>
+  
+  <!-- React and ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- ✅ Inject API base URL for production -->
-    <script>
-        window.API_BASE_URL = "https://coworking-checkin-system-production.up.railway.app";
-    </script>
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div id="root"></div>
+<body class="bg-blue-50">
+  <div id="root"></div>
 
-    <!-- Your React app -->
-    <script type="text/babel" src="/app.js"></script>
+  <!-- Your app script -->
+  <script type="text/babel" src="/app.js"></script>
 </body>
 </html>
