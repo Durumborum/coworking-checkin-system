@@ -15,8 +15,7 @@
       theme: {
         extend: {
           colors: {
-            primary: '#000000',        // Main black background
-            secondary: '#ABAEA0',      // Text and accent color
+            secondary: '#ABAEA0',  // Accent color for hovers, borders, etc.
           },
           fontFamily: {
             quattrocento: ['"Quattrocento Sans"', 'sans-serif'],
@@ -33,10 +32,8 @@
   <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-primary text-secondary font-quattrocento">
+<body class="bg-white text-black font-quattrocento">
   <div id="root"></div>
 
   <!-- App JS -->
-  <script type="text/babel" src="app.js"></script>
-</body>
-</html>
+  <script type="text/babel" src="app.js"></scrip
