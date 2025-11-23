@@ -169,9 +169,16 @@ function CoworkingApp() {
   return (
     <div className="min-h-screen font-quattrocento text-black bg-white">
       <div className="container mx-auto p-6">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Rami Ceramics Coworking</h1>
-          <p className="text-secondary">Check-in/out Management</p>
+        <header className="mb-6 flex items-center gap-4">
+          <img 
+            src="rami_logo_new.avif" 
+            alt="Rami Ceramics Logo" 
+            className="h-12 w-auto object-contain"
+          />
+          <div>
+            <h1 className="text-3xl font-bold mb-1">Rami Ceramics Coworking</h1>
+            <p className="text-secondary">Check-in/out Management</p>
+          </div>
         </header>
 
         <div className="flex gap-4 mb-6 flex-wrap">
