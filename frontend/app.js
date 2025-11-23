@@ -192,4 +192,7 @@ function CoworkingApp() {
   );
 }
 
-ReactDOM.render(<CoworkingApp />, document.getElementById('root'));
+// New way (React 18+):
+const rootElement = document.getElementById('root');
+const root = ReactDOM.createRoot(rootElement);
+root.render(<CoworkingApp />);
