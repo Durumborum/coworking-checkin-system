@@ -2,7 +2,7 @@
 // This version connects to your backend API instead of using storage
 
 const { useState, useEffect } = React;
-const { Users, Clock, TrendingUp, UserPlus, Edit2, Trash2, Save, X } = lucide;
+const { Users, Clock, TrendingUp, UserPlus, Edit2, Trash2, Save, X } = window.lucide;
 
 // Change this to your Railway API URL if testing separately
 const API_BASE_URL = window.location.origin; // Uses same server
