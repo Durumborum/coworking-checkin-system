@@ -1,26 +1,28 @@
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
-const path = require('path');
+// ---------------- IMPORTS ----------------
+const express = require('express'); // Express framework for building API
+const cors = require('cors'); // Enable Cross-Origin Resource Sharing
+const { Pool } = require('pg'); // PostgreSQL client
+const path = require('path'); // Node.js path utilities
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Default port 3000 if not set in env
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ---------------- MIDDLEWARE ----------------
+app.use(cors()); // Allow requests from any origin
+app.use(express.json()); // Parse incoming JSON requests
 
-// PostgreSQL connection
+// ---------------- DATABASE CONNECTION ----------------
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
+  connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL, // DB connection string
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false // Allow self-signed certs (for cloud DBs like Heroku)
   }
 });
 
-// Initialize database tables
+// ---------------- INITIALIZE DATABASE TABLES ----------------
 const initDatabase = async () => {
   try {
+    // Users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -32,6 +34,7 @@ const initDatabase = async () => {
       );
     `);
 
+    // Checkins table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS checkins (
         id TEXT PRIMARY KEY,
@@ -49,25 +52,29 @@ const initDatabase = async () => {
     console.error('Database initialization error:', error);
   }
 };
-initDatabase();
+initDatabase(); // Run immediately
 
 // ---------------- API ROUTES ----------------
 
-// Health check
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Check-in/out
+// ---------------- CHECK-IN / CHECK-OUT ----------------
 app.post('/api/checkin', async (req, res) => {
   const { card_id, timestamp } = req.body;
+
+  // Validate input
   if (!card_id) return res.status(400).json({ error: 'Card ID required' });
 
   try {
+    // Find user by card_id
     const userResult = await pool.query('SELECT * FROM users WHERE card_id = $1', [card_id]);
     const user = userResult.rows[0];
     if (!user) return res.status(404).json({ error: 'Card not registered' });
 
+    // Check if user already has an active session (no check_out)
     const sessionResult = await pool.query(
       'SELECT * FROM checkins WHERE user_id = $1 AND check_out IS NULL',
       [user.id]
@@ -75,13 +82,15 @@ app.post('/api/checkin', async (req, res) => {
     const activeSession = sessionResult.rows[0];
 
     if (activeSession) {
+      // User is checking out
       const checkOutTime = timestamp || new Date().toISOString();
       const checkInTime = new Date(activeSession.check_in);
-      const diff = new Date(checkOutTime) - checkInTime;
+      const diff = new Date(checkOutTime) - checkInTime; // difference in ms
       const hours = Math.floor(diff / 3600000);
       const minutes = Math.floor((diff % 3600000) / 60000);
       const duration = `${hours}h ${minutes}m`;
 
+      // Update session with check_out time and duration
       await pool.query(
         'UPDATE checkins SET check_out = $1, duration = $2 WHERE id = $3',
         [checkOutTime, duration, activeSession.id]
@@ -90,7 +99,8 @@ app.post('/api/checkin', async (req, res) => {
       console.log(`✓ ${user.name} checked out (${duration})`);
       return res.json({ message: `${user.name} checked out`, action: 'checkout', user: user.name, duration });
     } else {
-      const checkInId = Date.now().toString();
+      // User is checking in
+      const checkInId = Date.now().toString(); // Unique ID
       const checkInTime = timestamp || new Date().toISOString();
       await pool.query(
         'INSERT INTO checkins (id, user_id, user_name, check_in) VALUES ($1, $2, $3, $4)',
@@ -106,7 +116,9 @@ app.post('/api/checkin', async (req, res) => {
   }
 });
 
-// Users CRUD
+// ---------------- USERS CRUD ----------------
+
+// Get all users
 app.get('/api/users', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
@@ -117,11 +129,12 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// Add new user
 app.post('/api/users', async (req, res) => {
   const { name, email, card_id, included_hours } = req.body;
   if (!name || !card_id) return res.status(400).json({ error: 'Name and card_id required' });
 
-  const id = Date.now().toString();
+  const id = Date.now().toString(); // Generate simple unique ID
   const created_at = new Date().toISOString();
 
   try {
@@ -132,6 +145,7 @@ app.post('/api/users', async (req, res) => {
     console.log(`✓ New user created: ${name}`);
     res.json({ id, name, email, card_id, included_hours: included_hours || 0, created_at });
   } catch (error) {
+    // Handle duplicate card_id error
     if (error.code === '23505') res.status(400).json({ error: 'Card ID already exists' });
     else {
       console.error('Create user error:', error);
@@ -140,6 +154,7 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
+// Update user
 app.put('/api/users/:id', async (req, res) => {
   const { name, email, card_id, included_hours } = req.body;
   try {
@@ -158,6 +173,7 @@ app.put('/api/users/:id', async (req, res) => {
   }
 });
 
+// Delete user
 app.delete('/api/users/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM users WHERE id=$1', [req.params.id]);
@@ -169,7 +185,9 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// Checkins
+// ---------------- CHECKINS ----------------
+
+// Get all check-ins
 app.get('/api/checkins', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM checkins ORDER BY check_in DESC');
@@ -182,10 +200,10 @@ app.get('/api/checkins', async (req, res) => {
 
 // ---------------- STATIC FRONTEND ----------------
 
-// Serve frontend files
+// Serve React frontend
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-// Catch-all route to serve index.html for React Router (SPA)
+// SPA catch-all route for React Router
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });

@@ -13,7 +13,7 @@
     "checkin",
     "raspberry-pi"
   ],
-  "author": "",
+  "author": "Simon Borum",
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
