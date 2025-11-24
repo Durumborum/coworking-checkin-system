@@ -1,9 +1,10 @@
-   import Dashboard from "./components/Dashboard.jsx";
-   import Users from "./components/Users.jsx";
-   import History from "./components/History.jsx";
-   import Simulator from "./components/Simulator.jsx";
-   import { useUsers } from "./hooks/useUsers.jsx";
-   import { useCheckIns } from "./hooks/useCheckIns.jsx";
+import React, { useState } from "react";
+import Dashboard from "./components/Dashboard";
+import Users from "./components/Users";
+import History from "./components/History";
+import Simulator from "./components/Simulator";
+import { useUsers } from "./hooks/useUsers";
+import { useCheckIns } from "./hooks/useCheckIns";
 
 export default function App() {
   const [tab, setTab] = useState("dashboard");
