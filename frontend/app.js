@@ -1,35 +1,48 @@
+// Import React hooks and ReactDOM root creator
 const { useState, useEffect } = React;
 const { createRoot } = ReactDOM;
 
-// Use backend URL from index.html or fall back to current origin
+// Base URL for API calls, taken from index.html if set, else current origin
 const API_BASE_URL = window.API_BASE_URL || window.location.origin;
 
 function CoworkingApp() {
-  const [users, setUsers] = useState([]);
-  const [checkIns, setCheckIns] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [editingUser, setEditingUser] = useState(null);
-  const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '', included_hours: 0 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // ---------- STATE VARIABLES ----------
+  const [users, setUsers] = useState([]); // List of registered users
+  const [checkIns, setCheckIns] = useState([]); // List of check-in/out records
+  const [activeTab, setActiveTab] = useState('dashboard'); // Currently active tab
+  const [editingUser, setEditingUser] = useState(null); // User being edited
+  const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '', included_hours: 0 }); // Form state for new user
+  const [loading, setLoading] = useState(true); // Loading state for initial data fetch
+  const [error, setError] = useState(null); // Error state if data fetch fails
+  const [now, setNow] = useState(new Date()); // Current time for live timer
 
-  // Chart & date range state
-  const [dailyActiveData, setDailyActiveData] = useState([]);
-  const [activeRange, setActiveRange] = useState('30'); // default 30 days
-  const [historyUserFilter, setHistoryUserFilter] = useState(['all']);
-  const [historySortField, setHistorySortField] = useState('check_in');
-  const [historySortAsc, setHistorySortAsc] = useState(false);
+  // Chart & filter state
+  const [dailyActiveData, setDailyActiveData] = useState([]); // Daily active users chart data
+  const [activeRange, setActiveRange] = useState('30'); // Default date range for chart (30 days)
+  const [historyUserFilter, setHistoryUserFilter] = useState(['all']); // Filter for history table
+  const [historySortField, setHistorySortField] = useState('check_in'); // Sort field for history
+  const [historySortAsc, setHistorySortAsc] = useState(false); // Sort order
 
+  // ---------- EFFECTS ----------
   useEffect(() => {
+    // Load initial data and refresh every 10 seconds
     loadData();
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
+    // Regenerate chart data whenever checkIns or activeRange changes
     generateDailyActiveUsersChart();
   }, [checkIns, activeRange]);
 
+  useEffect(() => {
+    // Update `now` every second to refresh timers
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ---------- DATA FETCHING ----------
   const loadData = async () => {
     try {
       const [usersRes, checkInsRes] = await Promise.all([
@@ -50,6 +63,7 @@ function CoworkingApp() {
     }
   };
 
+  // ---------- HANDLERS ----------
   const handleCheckIn = async (cardId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/checkin`, {
@@ -131,10 +145,15 @@ function CoworkingApp() {
     }
   };
 
+  // ---------- DATA COMPUTATION ----------
   const getCurrentlyCheckedIn = () => checkIns.filter(c => !c.check_out);
-  const getTodayCheckIns = () => {
-    const today = new Date().toDateString();
-    return checkIns.filter(c => new Date(c.check_in).toDateString() === today);
+
+  const getElapsedTime = (checkInTime) => {
+    const diff = now - new Date(checkInTime);
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${hours}h ${minutes}m ${seconds}s`;
   };
 
   const getUserStats = (userId) => {
@@ -159,10 +178,8 @@ function CoworkingApp() {
       const end = new Date(now.getFullYear(), now.getMonth(), 0);
       setDailyActiveData(getDailyCounts(checkIns, start, end));
       return;
-    } else if (activeRange === 'month_to_date') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else start = new Date(now.getTime() - 29*24*60*60*1000);
-
+    } else if (activeRange === 'month_to_date') start = new Date(now.getFullYear(), now.getMonth(), 1);
+    else start = new Date(now.getTime() - 29*24*60*60*1000);
     const end = new Date(now);
     setDailyActiveData(getDailyCounts(checkIns, start, end));
   };
@@ -186,6 +203,7 @@ function CoworkingApp() {
       return new Date(b[historySortField]) - new Date(a[historySortField]);
     });
 
+  // ---------- CONDITIONAL RENDERING ----------
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white font-quattrocento text-black">
       <div>Loading...</div>
@@ -198,9 +216,11 @@ function CoworkingApp() {
     </div>
   );
 
+  // ---------- MAIN RENDER ----------
   return (
     <div className="min-h-screen font-quattrocento text-black bg-white">
       <div className="container mx-auto p-6">
+        {/* HEADER */}
         <header className="mb-6 flex items-center gap-4">
           <img src="rami_logo_new.avif" alt="Rami Ceramics Logo" className="h-12 w-auto object-contain" />
           <div>
@@ -209,6 +229,7 @@ function CoworkingApp() {
           </div>
         </header>
 
+        {/* TAB NAVIGATION */}
         <div className="flex gap-4 mb-6 flex-wrap">
           {['dashboard','users','history','simulator'].map(tab => (
             <button key={tab} onClick={()=>setActiveTab(tab)}
@@ -218,200 +239,131 @@ function CoworkingApp() {
           ))}
         </div>
 
-        {/* DASHBOARD */}
-        {activeTab==='dashboard' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 border rounded shadow">
-              <p>Currently In</p>
-              <p className="text-2xl font-bold">{getCurrentlyCheckedIn().length}</p>
-            </div>
-            <div className="p-4 border rounded shadow">
-              <p>Today's Check-ins</p>
-              <p className="text-2xl font-bold">{getTodayCheckIns().length}</p>
-            </div>
-            <div className="p-4 border rounded shadow">
-              <p>Total Users</p>
-              <p className="text-2xl font-bold">{users.length}</p>
-            </div>
-          </div>
-        )}
+        {/* TAB CONTENT */}
+        <div className="tab-content">
 
-        {/* USERS */}
-        {activeTab==='users' && (
-          <div className="space-y-6">
-            <div className="p-4 border rounded shadow">
-              <h2 className="font-bold mb-2">Add New User</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                <div>
-                  <label className="text-xs font-semibold">Name</label>
-                  <input placeholder="Name" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})} className="border px-2 py-1 w-full"/>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold">Email</label>
-                  <input placeholder="Email" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})} className="border px-2 py-1 w-full"/>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold">Card ID</label>
-                  <input placeholder="Card ID" value={newUser.cardId} onChange={e=>setNewUser({...newUser,cardId:e.target.value})} className="border px-2 py-1 w-full"/>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold">Included Hours</label>
-                  <input type="number" placeholder="Hours" value={newUser.included_hours} onChange={e=>setNewUser({...newUser,included_hours:e.target.value})} className="border px-2 py-1 w-full"/>
-                </div>
-              </div>
-              <button onClick={addUser} className="mt-2 bg-black text-white px-4 py-1 rounded">Add</button>
-            </div>
-
-            <div className="p-4 border rounded shadow overflow-x-auto">
-              <h2 className="font-bold mb-2">Registered Users</h2>
-              <table className="w-full border-collapse">
+          {/* ---------- DASHBOARD TAB ---------- */}
+          {activeTab === 'dashboard' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Currently Checked-in Users</h2>
+              <table className="w-full border border-black mb-6">
                 <thead>
-                  <tr>
-                    <th className="border px-2 py-1">Name</th>
-                    <th className="border px-2 py-1">Email</th>
-                    <th className="border px-2 py-1">Card ID</th>
-                    <th className="border px-2 py-1">Included Hours</th>
-                    <th className="border px-2 py-1">Actions</th>
+                  <tr className="bg-gray-200">
+                    <th className="border px-4 py-2">User</th>
+                    <th className="border px-4 py-2">Check-in Time</th>
+                    <th className="border px-4 py-2">Elapsed Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getCurrentlyCheckedIn().map(session => (
+                    <tr key={session.id}>
+                      <td className="border px-4 py-2">{session.user_name}</td>
+                      <td className="border px-4 py-2">{new Date(session.check_in).toLocaleString()}</td>
+                      <td className="border px-4 py-2">{getElapsedTime(session.check_in)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ---------- USERS TAB ---------- */}
+          {activeTab === 'users' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Users Management</h2>
+
+              {/* New User Form */}
+              <div className="mb-4">
+                <input type="text" placeholder="Name" value={newUser.name} onChange={e => setNewUser({...newUser, name:e.target.value})} className="border p-2 mr-2"/>
+                <input type="text" placeholder="Email" value={newUser.email} onChange={e => setNewUser({...newUser, email:e.target.value})} className="border p-2 mr-2"/>
+                <input type="text" placeholder="Card ID" value={newUser.cardId} onChange={e => setNewUser({...newUser, cardId:e.target.value})} className="border p-2 mr-2"/>
+                <input type="number" placeholder="Included Hours" value={newUser.included_hours} onChange={e => setNewUser({...newUser, included_hours:e.target.value})} className="border p-2 mr-2"/>
+                <button onClick={addUser} className="bg-black text-white px-4 py-2 rounded">Add User</button>
+              </div>
+
+              {/* Users Table */}
+              <table className="w-full border border-black">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border px-4 py-2">Name</th>
+                    <th className="border px-4 py-2">Email</th>
+                    <th className="border px-4 py-2">Card ID</th>
+                    <th className="border px-4 py-2">Included Hours</th>
+                    <th className="border px-4 py-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map(user => (
                     <tr key={user.id}>
-                      {editingUser?.id === user.id ? (
-                        <>
-                          <td className="border px-2 py-1">
-                            <input value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="border px-2 py-1 w-full"/>
-                          </td>
-                          <td className="border px-2 py-1">
-                            <input value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="border px-2 py-1 w-full"/>
-                          </td>
-                          <td className="border px-2 py-1">
-                            <input value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="border px-2 py-1 w-full"/>
-                          </td>
-                          <td className="border px-2 py-1">
-                            <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:e.target.value})} className="border px-2 py-1 w-full"/>
-                          </td>
-                          <td className="border px-2 py-1 flex gap-2">
-                            <button onClick={updateUser} className="px-2 py-1 bg-green-600 text-white rounded">💾 Save</button>
-                            <button onClick={()=>setEditingUser(null)} className="px-2 py-1 bg-gray-500 text-white rounded">✖</button>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="border px-2 py-1">{user.name}</td>
-                          <td className="border px-2 py-1">{user.email}</td>
-                          <td className="border px-2 py-1">{user.card_id}</td>
-                          <td className="border px-2 py-1">{user.included_hours}</td>
-                          <td className="border px-2 py-1 flex gap-2">
-                            <button onClick={()=>setEditingUser(user)} className="px-2 py-1 bg-blue-600 text-white rounded">✏️</button>
-                            <button onClick={()=>deleteUser(user.id)} className="px-2 py-1 bg-red-600 text-white rounded">🗑️</button>
-                          </td>
-                        </>
-                      )}
+                      <td className="border px-4 py-2">{editingUser?.id===user.id?<input value={editingUser.name} onChange={e=>setEditingUser({...editingUser,name:e.target.value})} className="border p-1"/>:user.name}</td>
+                      <td className="border px-4 py-2">{editingUser?.id===user.id?<input value={editingUser.email} onChange={e=>setEditingUser({...editingUser,email:e.target.value})} className="border p-1"/>:user.email}</td>
+                      <td className="border px-4 py-2">{editingUser?.id===user.id?<input value={editingUser.card_id} onChange={e=>setEditingUser({...editingUser,card_id:e.target.value})} className="border p-1"/>:user.card_id}</td>
+                      <td className="border px-4 py-2">{editingUser?.id===user.id?<input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:e.target.value})} className="border p-1"/>:user.included_hours}</td>
+                      <td className="border px-4 py-2">
+                        {editingUser?.id===user.id ? (
+                          <>
+                            <button onClick={updateUser} className="bg-green-500 text-white px-2 py-1 mr-1 rounded">Save</button>
+                            <button onClick={()=>setEditingUser(null)} className="bg-gray-400 text-white px-2 py-1 rounded">Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={()=>setEditingUser(user)} className="bg-blue-500 text-white px-2 py-1 mr-1 rounded">Edit</button>
+                            <button onClick={()=>deleteUser(user.id)} className="bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))}
-                  {users.length===0 && <tr><td colSpan={5} className="text-center py-2 text-secondary">No users registered yet.</td></tr>}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* HISTORY */}
-        {activeTab==='history' && (
-          <div className="space-y-6">
-
-            {/* User Filter */}
-            <div className="p-4 border rounded shadow">
-              <label className="font-semibold mb-1 block">Filter by User</label>
-              <select multiple value={historyUserFilter} onChange={e=>{
-                const selected = Array.from(e.target.selectedOptions, o=>o.value);
-                if (selected.includes('all')) setHistoryUserFilter(['all']);
-                else setHistoryUserFilter(selected.length?selected:['all']);
-              }} className="border px-2 py-1 rounded w-full">
-                <option value="all">All Users</option>
-                {users.map(u=> <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              <p className="text-xs text-secondary mt-1">Hold Ctrl/Cmd to select multiple users</p>
-            </div>
-
-            {/* Check-in/out History Table */}
-            <div className="p-4 border rounded shadow overflow-x-auto">
-              <h2 className="font-bold mb-2">Check-in/out History</h2>
-              <table className="w-full border-collapse">
+          {/* ---------- HISTORY TAB ---------- */}
+          {activeTab === 'history' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Check-in History</h2>
+              <table className="w-full border border-black">
                 <thead>
-                  <tr>
-                    {['user_name','check_in','check_out','duration'].map(field => (
-                      <th key={field} className="border px-2 py-1 cursor-pointer"
-                        onClick={()=> {
-                          if(historySortField===field) setHistorySortAsc(!historySortAsc);
-                          else { setHistorySortField(field); setHistorySortAsc(true); }
-                        }}
-                      >
-                        {field.replace('_',' ').toUpperCase()} {historySortField===field?(historySortAsc?'▲':'▼'):""}
-                      </th>
-                    ))}
+                  <tr className="bg-gray-200">
+                    <th className="border px-4 py-2 cursor-pointer" onClick={()=>{setHistorySortField('user_name'); setHistorySortAsc(!historySortAsc)}}>User</th>
+                    <th className="border px-4 py-2 cursor-pointer" onClick={()=>{setHistorySortField('check_in'); setHistorySortAsc(!historySortAsc)}}>Check-in</th>
+                    <th className="border px-4 py-2 cursor-pointer" onClick={()=>{setHistorySortField('check_out'); setHistorySortAsc(!historySortAsc)}}>Check-out</th>
+                    <th className="border px-4 py-2">Duration</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedCheckIns.slice().reverse().map(c=>(
-                    <tr key={c.id}>
-                      <td className="border px-2 py-1">{c.user_name}</td>
-                      <td className="border px-2 py-1">{new Date(c.check_in).toLocaleString()}</td>
-                      <td className="border px-2 py-1">{c.check_out?new Date(c.check_out).toLocaleString():'✅ In'}</td>
-                      <td className="border px-2 py-1">{c.duration||'-'}</td>
+                  {sortedCheckIns.map(session => (
+                    <tr key={session.id}>
+                      <td className="border px-4 py-2">{session.user_name}</td>
+                      <td className="border px-4 py-2">{new Date(session.check_in).toLocaleString()}</td>
+                      <td className="border px-4 py-2">{session.check_out? new Date(session.check_out).toLocaleString(): '-'}</td>
+                      <td className="border px-4 py-2">{session.duration || (session.check_out? getElapsedTime(session.check_in): getElapsedTime(session.check_in))}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )}
 
-            {/* Daily Active Users Table */}
-            <div className="p-4 border rounded shadow overflow-x-auto">
-              <h2 className="font-bold mb-2">Daily Active Users</h2>
-              <div className="flex gap-2 mb-2">
-                <button className={`px-2 py-1 border rounded ${activeRange==='7'?'bg-black text-white':''}`} onClick={()=>setActiveRange('7')}>Last 7 Days</button>
-                <button className={`px-2 py-1 border rounded ${activeRange==='prev_month'?'bg-black text-white':''}`} onClick={()=>setActiveRange('prev_month')}>Previous Month</button>
-                <button className={`px-2 py-1 border rounded ${activeRange==='month_to_date'?'bg-black text-white':''}`} onClick={()=>setActiveRange('month_to_date')}>This Month-to-Date</button>
-              </div>
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="border px-2 py-1 cursor-pointer">Date</th>
-                    <th className="border px-2 py-1 cursor-pointer">Active Users</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dailyActiveData.map(([date,count])=>(
-                    <tr key={date}>
-                      <td className="border px-2 py-1">{date}</td>
-                      <td className="border px-2 py-1">{count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* ---------- SIMULATOR TAB ---------- */}
+          {activeTab === 'simulator' && (
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Simulator</h2>
+              <p className="mb-2">Simulate check-in/out by selecting a user:</p>
+              {users.map(user => (
+                <div key={user.id} className="mb-2 flex items-center gap-2">
+                  <span>{user.name}</span>
+                  <button onClick={()=>handleCheckIn(user.card_id)} className="bg-black text-white px-3 py-1 rounded">Check-in/out</button>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* SIMULATOR */}
-        {activeTab==='simulator' && (
-          <div className="p-4 border rounded shadow">
-            <h2 className="font-bold mb-2">NFC Simulator</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              {users.map(u=>(<button key={u.id} onClick={()=>handleCheckIn(u.card_id)}
-                className="p-2 border rounded hover:bg-secondary transition-colors">
-                  <p>{u.name}</p>
-                  <p className="text-xs">Card: {u.card_id}</p>
-                </button>))}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
 
-const rootElement = document.getElementById('root');
-const root = createRoot(rootElement);
-root.render(<CoworkingApp />);
+// ---------- RENDER ROOT ----------
