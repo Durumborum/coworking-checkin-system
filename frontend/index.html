@@ -2,44 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Coworking Check-in System</title>
-
-    <!-- Load React and ReactDOM first (without defer) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
     <link
       href="https://fonts.googleapis.com/css2?family=Quattrocento+Sans:wght@400;700&display=swap"
       rel="stylesheet"
     />
-
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <style>
-      body {
-        font-family: 'Quattrocento Sans', sans-serif;
-      }
-    </style>
   </head>
-
   <body class="bg-white text-black">
     <div id="root"></div>
-
-    <!-- Load all scripts without defer, in order -->
-    <script type="text/babel" src="src/config.js"></script>
-    <script type="text/babel" src="src/hooks/useUsers.js"></script>
-    <script type="text/babel" src="src/hooks/useCheckIns.js"></script>
-    <script type="text/babel" src="src/components/Dashboard.js"></script>
-    <script type="text/babel" src="src/components/Users.js"></script>
-    <script type="text/babel" src="src/components/History.js"></script>
-    <script type="text/babel" src="src/components/Simulator.js"></script>
-    <script type="text/babel" src="src/app.js"></script>
-
-    <!-- Mount React App -->
-    <script type="text/babel">
-      const root = ReactDOM.createRoot(document.getElementById("root"));
-      root.render(<App />);
-    </script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

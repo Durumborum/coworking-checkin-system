@@ -1,10 +1,9 @@
-import React, { useState } from "react";
-import Dashboard from "./components/Dashboard";
-import Users from "./components/Users";
-import History from "./components/History";
-import Simulator from "./components/Simulator";
-import { useUsers } from "./hooks/useUsers";
-import { useCheckIns } from "./hooks/useCheckIns";
+   import Dashboard from "./components/Dashboard.jsx";
+   import Users from "./components/Users.jsx";
+   import History from "./components/History.jsx";
+   import Simulator from "./components/Simulator.jsx";
+   import { useUsers } from "./hooks/useUsers.jsx";
+   import { useCheckIns } from "./hooks/useCheckIns.jsx";
 
 export default function App() {
   const [tab, setTab] = useState("dashboard");
@@ -23,7 +22,7 @@ export default function App() {
   return (
     <div className="p-6">
       <header className="flex items-center justify-between mb-6">
-        <img src="rami_logo_new.avif" alt="Logo" className="h-12" />
+        <img src="/rami_logo_new.avif" alt="Logo" className="h-12" />
         <nav className="flex gap-4">
           <button className={tab==="dashboard"?"font-bold":""} onClick={() => setTab("dashboard")}>Dashboard</button>
           <button className={tab==="users"?"font-bold":""} onClick={() => setTab("users")}>Users</button>

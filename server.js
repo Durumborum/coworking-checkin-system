@@ -51,14 +51,60 @@ const initDatabase = async () => {
 };
 initDatabase();
 
-// ---------------- API ROUTES ----------------
+// Simulate check-in (for testing without NFC reader)
+app.post('/api/simulate-checkin', async (req, res) => {
+  const { card_id, timestamp } = req.body;
+  if (!card_id) return res.status(400).json({ error: 'Card ID required' });
+
+  try {
+    const userResult = await pool.query('SELECT * FROM users WHERE card_id = $1', [card_id]);
+    const user = userResult.rows[0];
+    if (!user) return res.status(404).json({ error: 'Card not registered' });
+
+    const sessionResult = await pool.query(
+      'SELECT * FROM checkins WHERE user_id = $1 AND check_out IS NULL',
+      [user.id]
+    );
+    const activeSession = sessionResult.rows[0];
+
+    if (activeSession) {
+      const checkOutTime = timestamp || new Date().toISOString();
+      const checkInTime = new Date(activeSession.check_in);
+      const diff = new Date(checkOutTime) - checkInTime;
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const duration = `${hours}h ${minutes}m`;
+
+      await pool.query(
+        'UPDATE checkins SET check_out = $1, duration = $2 WHERE id = $3',
+        [checkOutTime, duration, activeSession.id]
+      );
+
+      console.log(`✓ ${user.name} checked out (${duration})`);
+      return res.json({ message: `${user.name} checked out`, action: 'checkout', user: user.name, duration });
+    } else {
+      const checkInId = Date.now().toString();
+      const checkInTime = timestamp || new Date().toISOString();
+      await pool.query(
+        'INSERT INTO checkins (id, user_id, user_name, check_in) VALUES ($1, $2, $3, $4)',
+        [checkInId, user.id, user.name, checkInTime]
+      );
+
+      console.log(`✓ ${user.name} checked in`);
+      return res.json({ message: `${user.name} checked in`, action: 'checkin', user: user.name });
+    }
+  } catch (error) {
+    console.error('Simulate check-in error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Check-in/out
+// Check-in/out (from NFC reader)
 app.post('/api/checkin', async (req, res) => {
   const { card_id, timestamp } = req.body;
   if (!card_id) return res.status(400).json({ error: 'Card ID required' });
@@ -180,17 +226,33 @@ app.get('/api/checkins', async (req, res) => {
   }
 });
 
-// ---------------- STATIC FRONTEND ----------------
-
-// Serve frontend files
-app.use(express.static(path.join(__dirname, 'frontend')));
-
-// Catch-all route to serve index.html for React Router (SPA)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+// Get currently checked-in users
+app.get('/api/checkins/active', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM checkins WHERE check_out IS NULL ORDER BY check_in DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get active check-ins error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// ---------------- START SERVER ----------------
+// ---------- STATIC FRONTEND (Production Build) ----------
+
+// Serve built Vite frontend from dist folder
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
+  
+  // Catch-all route to serve index.html for React Router (SPA)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+  });
+}
+
+// ---------- START SERVER ----------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`Serving frontend from ${path.join(__dirname, 'frontend', 'dist')}`);
+  }
 });

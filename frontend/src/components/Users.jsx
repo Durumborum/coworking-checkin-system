@@ -1,6 +1,6 @@
-import UserForm from "./ui/UserForm";
-import { useState } from "react";
-import { API_BASE_URL } from "../config";
+import UserForm from "./ui/UserForm.jsx";
+   import { useState } from "react";
+   import { API_BASE_URL } from "../config";
 
 export default function Users({ users, loadUsers }) {
   const [editingUser, setEditingUser] = useState(null);

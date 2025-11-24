@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config";
-import { useState } from "react";
+   import { useState } from "react";
 
 export default function Simulator({ reload }) {
   const [cardId, setCardId] = useState("");
