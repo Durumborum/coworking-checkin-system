@@ -9,7 +9,7 @@ function CoworkingApp() {
   const [checkIns, setCheckIns] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [editingUser, setEditingUser] = useState(null);
-  const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '', included_hours: 0 });
+  const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '', included_hours: 0, user_type: 'abo', credits: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sessionDurations, setSessionDurations] = useState({});
@@ -129,14 +129,16 @@ function CoworkingApp() {
           name: newUser.name,
           email: newUser.email,
           card_id: newUser.cardId,
-          included_hours: parseInt(newUser.included_hours) || 0
+          included_hours: parseInt(newUser.included_hours) || 0,
+          user_type: newUser.user_type,
+          credits: parseInt(newUser.credits) || 0
         })
       });
       if (!response.ok) {
         const err = await response.json();
         alert(err.error || 'Failed to add user');
       } else {
-        setNewUser({ name: '', email: '', cardId: '', included_hours: 0 });
+        setNewUser({ name: '', email: '', cardId: '', included_hours: 0, user_type: 'abo', credits: 0 });
         loadData();
       }
     } catch (err) {
@@ -153,7 +155,9 @@ function CoworkingApp() {
           name: editingUser.name,
           email: editingUser.email,
           card_id: editingUser.card_id,
-          included_hours: parseInt(editingUser.included_hours) || 0
+          included_hours: parseInt(editingUser.included_hours) || 0,
+          user_type: editingUser.user_type,
+          credits: parseInt(editingUser.credits) || 0
         })
       });
       if (response.ok) {
@@ -344,7 +348,7 @@ function CoworkingApp() {
           <div className="space-y-6">
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Add New User</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                 <div>
                   <label className="text-xs font-semibold">Name</label>
                   <input placeholder="Name" value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})} className="border px-2 py-1 w-full"/>
@@ -361,6 +365,17 @@ function CoworkingApp() {
                   <label className="text-xs font-semibold">Included Hours</label>
                   <input type="number" placeholder="Hours" value={newUser.included_hours} onChange={e=>setNewUser({...newUser,included_hours:e.target.value})} className="border px-2 py-1 w-full"/>
                 </div>
+                <div>
+                  <label className="text-xs font-semibold">User Type</label>
+                  <select value={newUser.user_type} onChange={e=>setNewUser({...newUser,user_type:e.target.value})} className="border px-2 py-1 w-full">
+                    <option value="abo">Abo</option>
+                    <option value="credit">Credit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold">Credits</label>
+                  <input type="number" placeholder="Credits" value={newUser.credits} onChange={e=>setNewUser({...newUser,credits:e.target.value})} className="border px-2 py-1 w-full"/>
+                </div>
               </div>
               <button onClick={addUser} className="mt-2 bg-black text-white px-4 py-1 rounded">Add</button>
             </div>
@@ -374,6 +389,8 @@ function CoworkingApp() {
                     <th className="border px-2 py-1">Email</th>
                     <th className="border px-2 py-1">Card ID</th>
                     <th className="border px-2 py-1">Included Hours</th>
+                    <th className="border px-2 py-1">User Type</th>
+                    <th className="border px-2 py-1">Credits</th>
                     <th className="border px-2 py-1">Actions</th>
                   </tr>
                 </thead>
@@ -394,6 +411,15 @@ function CoworkingApp() {
                           <td className="border px-2 py-1">
                             <input type="number" value={editingUser.included_hours} onChange={e=>setEditingUser({...editingUser,included_hours:e.target.value})} className="border px-2 py-1 w-full"/>
                           </td>
+                          <td className="border px-2 py-1">
+                            <select value={editingUser.user_type} onChange={e=>setEditingUser({...editingUser,user_type:e.target.value})} className="border px-2 py-1 w-full">
+                              <option value="abo">Abo</option>
+                              <option value="credit">Credit</option>
+                            </select>
+                          </td>
+                          <td className="border px-2 py-1">
+                            <input type="number" value={editingUser.credits} onChange={e=>setEditingUser({...editingUser,credits:e.target.value})} className="border px-2 py-1 w-full"/>
+                          </td>
                           <td className="border px-2 py-1 flex gap-2">
                             <button onClick={updateUser} className="px-2 py-1 bg-green-600 text-white rounded">💾 Save</button>
                             <button onClick={()=>setEditingUser(null)} className="px-2 py-1 bg-gray-500 text-white rounded">✖</button>
@@ -405,6 +431,8 @@ function CoworkingApp() {
                           <td className="border px-2 py-1">{user.email}</td>
                           <td className="border px-2 py-1">{user.card_id}</td>
                           <td className="border px-2 py-1">{user.included_hours}</td>
+                          <td className="border px-2 py-1">{user.user_type}</td>
+                          <td className="border px-2 py-1">{user.credits}</td>
                           <td className="border px-2 py-1 flex gap-2">
                             <button onClick={()=>setEditingUser(user)} className="px-2 py-1 bg-blue-600 text-white rounded">✏️</button>
                             <button onClick={()=>deleteUser(user.id)} className="px-2 py-1 bg-red-600 text-white rounded">🗑️</button>
@@ -413,7 +441,7 @@ function CoworkingApp() {
                       )}
                     </tr>
                   ))}
-                  {users.length===0 && <tr><td colSpan={5} className="text-center py-2 text-secondary">No users registered yet.</td></tr>}
+                  {users.length===0 && <tr><td colSpan={7} className="text-center py-2 text-secondary">No users registered yet.</td></tr>}
                 </tbody>
               </table>
             </div>

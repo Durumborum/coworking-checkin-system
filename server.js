@@ -30,6 +30,8 @@ const initDatabase = async () => {
         email TEXT,
         card_id TEXT UNIQUE NOT NULL,
         included_hours INT4 DEFAULT 0,
+        user_type TEXT DEFAULT 'abo',
+        credits INT4 DEFAULT 0,
         created_at TEXT NOT NULL
       );
     `);
@@ -116,21 +118,6 @@ app.post('/api/checkin', async (req, res) => {
   }
 });
 
-// Delete a check-in record
-app.delete('/api/checkins/:id', async (req, res) => {
-  try {
-    const result = await pool.query('DELETE FROM checkins WHERE id=$1', [req.params.id]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Check-in record not found' });
-    }
-    console.log(`✓ Check-in deleted: ${req.params.id}`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Delete check-in error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // ---------------- USERS CRUD ----------------
 
 // Get all users
@@ -146,7 +133,7 @@ app.get('/api/users', async (req, res) => {
 
 // Add new user
 app.post('/api/users', async (req, res) => {
-  const { name, email, card_id, included_hours } = req.body;
+  const { name, email, card_id, included_hours, user_type, credits } = req.body;
   if (!name || !card_id) return res.status(400).json({ error: 'Name and card_id required' });
 
   const id = Date.now().toString(); // Generate simple unique ID
@@ -154,11 +141,11 @@ app.post('/api/users', async (req, res) => {
 
   try {
     await pool.query(
-      'INSERT INTO users (id, name, email, card_id, included_hours, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, name, email || '', card_id, included_hours || 0, created_at]
+      'INSERT INTO users (id, name, email, card_id, included_hours, user_type, credits, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, name, email || '', card_id, included_hours || 0, user_type || 'abo', credits || 0, created_at]
     );
     console.log(`✓ New user created: ${name}`);
-    res.json({ id, name, email, card_id, included_hours: included_hours || 0, created_at });
+    res.json({ id, name, email, card_id, included_hours: included_hours || 0, user_type: user_type || 'abo', credits: credits || 0, created_at });
   } catch (error) {
     // Handle duplicate card_id error
     if (error.code === '23505') res.status(400).json({ error: 'Card ID already exists' });
@@ -171,14 +158,14 @@ app.post('/api/users', async (req, res) => {
 
 // Update user
 app.put('/api/users/:id', async (req, res) => {
-  const { name, email, card_id, included_hours } = req.body;
+  const { name, email, card_id, included_hours, user_type, credits } = req.body;
   try {
     await pool.query(
-      'UPDATE users SET name=$1, email=$2, card_id=$3, included_hours=$4 WHERE id=$5',
-      [name, email || '', card_id, included_hours || 0, req.params.id]
+      'UPDATE users SET name=$1, email=$2, card_id=$3, included_hours=$4, user_type=$5, credits=$6 WHERE id=$7',
+      [name, email || '', card_id, included_hours || 0, user_type || 'abo', credits || 0, req.params.id]
     );
     console.log(`✓ User updated: ${name}`);
-    res.json({ id: req.params.id, name, email, card_id, included_hours: included_hours || 0 });
+    res.json({ id: req.params.id, name, email, card_id, included_hours: included_hours || 0, user_type: user_type || 'abo', credits: credits || 0 });
   } catch (error) {
     if (error.code === '23505') res.status(400).json({ error: 'Card ID already exists' });
     else {
@@ -209,6 +196,21 @@ app.get('/api/checkins', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Get check-ins error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a check-in record
+app.delete('/api/checkins/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM checkins WHERE id=$1', [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Check-in record not found' });
+    }
+    console.log(`✓ Check-in deleted: ${req.params.id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete check-in error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
