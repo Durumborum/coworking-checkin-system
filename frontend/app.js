@@ -13,6 +13,8 @@ function CoworkingApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sessionDurations, setSessionDurations] = useState({});
+  const [cardCheckMode, setCardCheckMode] = useState(false);
+  const [lastScannedCard, setLastScannedCard] = useState(null);
 
   // Chart & date range state
   const [dailyActiveData, setDailyActiveData] = useState([]);
@@ -38,6 +40,18 @@ function CoworkingApp() {
     }, 1000);
     return () => clearInterval(interval);
   }, [checkIns]);
+
+  // Poll for new card scans when in card check mode
+  useEffect(() => {
+    if (!cardCheckMode) return;
+    
+    const interval = setInterval(() => {
+      // Reload data to check for new scans
+      loadData();
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [cardCheckMode]);
 
   const loadData = async () => {
     try {
@@ -346,6 +360,47 @@ function CoworkingApp() {
         {/* USERS */}
         {activeTab==='users' && (
           <div className="space-y-6">
+            {/* Card Check Mode */}
+            <div className="p-4 border rounded shadow bg-blue-50">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold">Card Check Mode</h2>
+                <button 
+                  onClick={() => {
+                    setCardCheckMode(!cardCheckMode);
+                    setLastScannedCard(null);
+                  }}
+                  className={`px-4 py-2 rounded font-semibold ${cardCheckMode ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
+                >
+                  {cardCheckMode ? '● Active - Click to Disable' : '○ Inactive - Click to Enable'}
+                </button>
+              </div>
+              {cardCheckMode && (
+                <div className="text-sm">
+                  <p className="text-secondary mb-2">Scan a card with your NFC reader to check its status...</p>
+                  {lastScannedCard && (
+                    <div className="p-3 border-2 border-blue-400 rounded bg-white">
+                      <p className="font-mono font-bold text-lg mb-2">Card ID: {lastScannedCard.cardId}</p>
+                      {lastScannedCard.user ? (
+                        <div className="bg-green-100 p-2 rounded border border-green-400">
+                          <p className="font-semibold text-green-800">✓ User Found</p>
+                          <p className="text-sm mt-1"><strong>Name:</strong> {lastScannedCard.user.name}</p>
+                          <p className="text-sm"><strong>Email:</strong> {lastScannedCard.user.email}</p>
+                          <p className="text-sm"><strong>Type:</strong> {lastScannedCard.user.user_type}</p>
+                          {lastScannedCard.user.user_type === 'credit' && (
+                            <p className="text-sm"><strong>Credits:</strong> {lastScannedCard.user.credits}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-red-100 p-2 rounded border border-red-400">
+                          <p className="font-semibold text-red-800">✗ No user registered with this card</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="p-4 border rounded shadow">
               <h2 className="font-bold mb-2">Add New User</h2>
               <div className="grid grid-cols-1 md:grid-cols-6 gap-2">

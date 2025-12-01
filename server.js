@@ -63,6 +63,27 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Check card status endpoint
+app.post('/api/check-card', async (req, res) => {
+  const { card_id } = req.body;
+  
+  if (!card_id) return res.status(400).json({ error: 'Card ID required' });
+  
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE card_id = $1', [card_id]);
+    const user = result.rows[0];
+    
+    if (user) {
+      res.json({ card_id, user });
+    } else {
+      res.json({ card_id, user: null });
+    }
+  } catch (error) {
+    console.error('Check card error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ---------------- CHECK-IN / CHECK-OUT ----------------
 app.post('/api/checkin', async (req, res) => {
   const { card_id, timestamp } = req.body;
