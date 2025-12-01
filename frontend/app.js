@@ -12,6 +12,7 @@ function CoworkingApp() {
   const [newUser, setNewUser] = useState({ name: '', email: '', cardId: '', included_hours: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sessionDurations, setSessionDurations] = useState({});
 
   // Chart & date range state
   const [dailyActiveData, setDailyActiveData] = useState([]);
@@ -29,6 +30,14 @@ function CoworkingApp() {
   useEffect(() => {
     generateDailyActiveUsersChart();
   }, [checkIns, activeRange]);
+
+  // Update session durations every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      updateSessionDurations();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [checkIns]);
 
   const loadData = async () => {
     try {
@@ -50,6 +59,22 @@ function CoworkingApp() {
     }
   };
 
+  const updateSessionDurations = () => {
+    const durations = {};
+    const now = new Date();
+    checkIns.forEach(c => {
+      if (!c.check_out) {
+        const checkInTime = new Date(c.check_in);
+        const diff = now - checkInTime;
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        durations[c.id] = `${hours}h ${minutes}m ${seconds}s`;
+      }
+    });
+    setSessionDurations(durations);
+  };
+
   const handleCheckIn = async (cardId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/checkin`, {
@@ -63,6 +88,28 @@ function CoworkingApp() {
         loadData();
       } else {
         alert(result.error || 'Error processing check-in');
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    }
+  };
+
+  const manualCheckout = async (sessionId, cardId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/checkin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          card_id: cardId,
+          timestamp: new Date().toISOString()
+        })
+      });
+      const result = await response.json();
+      if (response.ok) {
+        alert(result.message);
+        loadData();
+      } else {
+        alert(result.error || 'Error processing checkout');
       }
     } catch (err) {
       alert('Network error: ' + err.message);
@@ -220,18 +267,59 @@ function CoworkingApp() {
 
         {/* DASHBOARD */}
         {activeTab==='dashboard' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 border rounded shadow">
-              <p>Currently In</p>
-              <p className="text-2xl font-bold">{getCurrentlyCheckedIn().length}</p>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 border rounded shadow">
+                <p>Currently In</p>
+                <p className="text-2xl font-bold">{getCurrentlyCheckedIn().length}</p>
+              </div>
+              <div className="p-4 border rounded shadow">
+                <p>Today's Check-ins</p>
+                <p className="text-2xl font-bold">{getTodayCheckIns().length}</p>
+              </div>
+              <div className="p-4 border rounded shadow">
+                <p>Total Users</p>
+                <p className="text-2xl font-bold">{users.length}</p>
+              </div>
             </div>
-            <div className="p-4 border rounded shadow">
-              <p>Today's Check-ins</p>
-              <p className="text-2xl font-bold">{getTodayCheckIns().length}</p>
-            </div>
-            <div className="p-4 border rounded shadow">
-              <p>Total Users</p>
-              <p className="text-2xl font-bold">{users.length}</p>
+
+            {/* Active Sessions Table */}
+            <div className="p-4 border rounded shadow overflow-x-auto">
+              <h2 className="font-bold mb-4">Currently Checked In</h2>
+              {getCurrentlyCheckedIn().length === 0 ? (
+                <p className="text-secondary">No users currently checked in</p>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="border px-2 py-1">Name</th>
+                      <th className="border px-2 py-1">Check-in Time</th>
+                      <th className="border px-2 py-1">Duration</th>
+                      <th className="border px-2 py-1">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getCurrentlyCheckedIn().map(session => {
+                      const user = users.find(u => u.id === session.user_id);
+                      return (
+                        <tr key={session.id}>
+                          <td className="border px-2 py-1">{session.user_name}</td>
+                          <td className="border px-2 py-1">{new Date(session.check_in).toLocaleString()}</td>
+                          <td className="border px-2 py-1 font-mono">{sessionDurations[session.id] || '0h 0m 0s'}</td>
+                          <td className="border px-2 py-1">
+                            <button 
+                              onClick={() => manualCheckout(session.id, user.card_id)}
+                              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                              Check Out
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}

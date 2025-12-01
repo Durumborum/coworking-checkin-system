@@ -1,4 +1,3 @@
-cat > nfc_reader.py << 'EOF'
 #!/usr/bin/env python3
 """
 NFC Card Reader for Coworking Check-in System
@@ -106,7 +105,3 @@ if __name__ == '__main__':
 ╚════════════════════════════════════════════════╝
     """)
     read_nfc_card()
-EOF
-
-# Make it executable
-chmod +x nfc_reader.py
