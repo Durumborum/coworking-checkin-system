@@ -178,6 +178,21 @@ function CoworkingApp() {
     }
   };
 
+  const deleteCheckIn = async (checkInId) => {
+    if (!confirm('Are you sure you want to delete this check-in record?')) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/checkins/${checkInId}`, { method: 'DELETE' });
+      if (response.ok) {
+        alert('Check-in record deleted');
+        loadData();
+      } else {
+        alert('Failed to delete check-in record');
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    }
+  };
+
   const getCurrentlyCheckedIn = () => checkIns.filter(c => !c.check_out);
   const getTodayCheckIns = () => {
     const today = new Date().toDateString();
@@ -439,6 +454,7 @@ function CoworkingApp() {
                         {field.replace('_',' ').toUpperCase()} {historySortField===field?(historySortAsc?'▲':'▼'):""}
                       </th>
                     ))}
+                    <th className="border px-2 py-1">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -448,6 +464,9 @@ function CoworkingApp() {
                       <td className="border px-2 py-1">{new Date(c.check_in).toLocaleString()}</td>
                       <td className="border px-2 py-1">{c.check_out?new Date(c.check_out).toLocaleString():'✅ In'}</td>
                       <td className="border px-2 py-1">{c.duration||'-'}</td>
+                      <td className="border px-2 py-1">
+                        <button onClick={() => deleteCheckIn(c.id)} className="px-2 py-1 bg-red-600 text-white rounded text-sm">🗑️ Delete</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
