@@ -104,10 +104,28 @@ app.post('/api/checkin', async (req, res) => {
       // User is checking in
       const checkInId = Date.now().toString(); // Unique ID
       const checkInTime = timestamp || new Date().toISOString();
+      
+      // Insert check-in record
       await pool.query(
         'INSERT INTO checkins (id, user_id, user_name, check_in) VALUES ($1, $2, $3, $4)',
         [checkInId, user.id, user.name, checkInTime]
       );
+
+      // If user type is credit, deduct one credit
+      if (user.user_type === 'credit') {
+        const newCredits = Math.max(user.credits - 1, 0); // Don't go below 0
+        await pool.query(
+          'UPDATE users SET credits = $1 WHERE id = $2',
+          [newCredits, user.id]
+        );
+        console.log(`✓ ${user.name} checked in (Credits: ${user.credits} -> ${newCredits})`);
+        return res.json({ 
+          message: `${user.name} checked in`, 
+          action: 'checkin', 
+          user: user.name,
+          credits_remaining: newCredits 
+        });
+      }
 
       console.log(`✓ ${user.name} checked in`);
       return res.json({ message: `${user.name} checked in`, action: 'checkin', user: user.name });
