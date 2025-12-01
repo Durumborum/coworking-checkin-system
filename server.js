@@ -116,6 +116,21 @@ app.post('/api/checkin', async (req, res) => {
   }
 });
 
+// Delete a check-in record
+app.delete('/api/checkins/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM checkins WHERE id=$1', [req.params.id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Check-in record not found' });
+    }
+    console.log(`✓ Check-in deleted: ${req.params.id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete check-in error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ---------------- USERS CRUD ----------------
 
 // Get all users
