@@ -181,7 +181,8 @@ app.get('/api/users', async (req, res) => {
     const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Fetch users error:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
@@ -200,7 +201,10 @@ app.post('/api/users', async (req, res) => {
     res.json({ id, name, email, card_id, included_hours, user_type, credits, created_at });
   } catch (error) {
     if (error.code === '23505') res.status(400).json({ error: 'Card ID already exists' });
-    else res.status(500).json({ error: 'Server error' });
+    else {
+      console.error('Add user error:', error);
+      res.status(500).json({ error: 'Server error', details: error.message });
+    }
   }
 });
 
@@ -213,7 +217,8 @@ app.put('/api/users/:id', async (req, res) => {
     );
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
@@ -222,7 +227,8 @@ app.delete('/api/users/:id', async (req, res) => {
     await pool.query('DELETE FROM users WHERE id=$1', [req.params.id]);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
@@ -233,7 +239,8 @@ app.get('/api/checkins', async (req, res) => {
     const result = await pool.query('SELECT * FROM checkins ORDER BY check_in DESC');
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Fetch checkins error:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
@@ -242,7 +249,8 @@ app.delete('/api/checkins/:id', async (req, res) => {
     await pool.query('DELETE FROM checkins WHERE id=$1', [req.params.id]);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Delete checkin error:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
