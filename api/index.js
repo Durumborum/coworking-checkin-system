@@ -78,8 +78,25 @@ initDatabase();
 // ---------------- API ROUTES ----------------
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', database: 'supabase', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  const dbConfigured = !!(process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL);
+  
+  let dbStatus = 'Not Configured';
+  if (dbConfigured) {
+    try {
+      const result = await pool.query('SELECT NOW()');
+      dbStatus = 'Connected';
+    } catch (err) {
+      dbStatus = `Error: ${err.message}`;
+    }
+  }
+
+  res.json({ 
+    status: 'ok', 
+    database: 'supabase', 
+    database_status: dbStatus,
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // Check card status endpoint
