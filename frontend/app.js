@@ -15,6 +15,8 @@ function CoworkingApp() {
   const [sessionDurations, setSessionDurations] = useState({});
   const [cardCheckMode, setCardCheckMode] = useState(false);
   const [lastScannedCard, setLastScannedCard] = useState(null);
+  const [password, setPassword] = useState(localStorage.getItem('admin_password') || '');
+  const [isAuthorized, setIsAuthorized] = useState(true); // Assume true, catch 401 later
 
   // Chart & date range state
   const [dailyActiveData, setDailyActiveData] = useState([]);
@@ -53,11 +55,24 @@ function CoworkingApp() {
     return () => clearInterval(interval);
   }, [cardCheckMode]);
 
+  const fetchWithAuth = async (url, options = {}) => {
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${password}`
+    };
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+      setIsAuthorized(false);
+      throw new Error('Unauthorized');
+    }
+    return response;
+  };
+
   const loadData = async () => {
     try {
       const [usersRes, checkInsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/users`),
-        fetch(`${API_BASE_URL}/api/checkins`)
+        fetchWithAuth(`${API_BASE_URL}/api/users`),
+        fetchWithAuth(`${API_BASE_URL}/api/checkins`)
       ]);
       const usersData = await usersRes.json();
       const checkInsData = await checkInsRes.json();
@@ -91,7 +106,7 @@ function CoworkingApp() {
 
   const handleCheckIn = async (cardId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/checkin`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/checkin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ card_id: cardId })
@@ -110,7 +125,7 @@ function CoworkingApp() {
 
   const manualCheckout = async (sessionId, cardId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/checkin`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/checkin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -136,7 +151,7 @@ function CoworkingApp() {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -162,7 +177,7 @@ function CoworkingApp() {
 
   const updateUser = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +204,7 @@ function CoworkingApp() {
   const deleteUser = async (id) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
       if (response.ok) loadData();
     } catch (err) {
       alert('Network error: ' + err.message);
@@ -199,7 +214,7 @@ function CoworkingApp() {
   const deleteCheckIn = async (checkInId) => {
     if (!confirm('Are you sure you want to delete this check-in record?')) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/checkins/${checkInId}`, { method: 'DELETE' });
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/checkins/${checkInId}`, { method: 'DELETE' });
       if (response.ok) {
         alert('Check-in record deleted');
         loadData();
@@ -265,6 +280,44 @@ function CoworkingApp() {
       if (historySortAsc) return new Date(a[historySortField]) - new Date(b[historySortField]);
       return new Date(b[historySortField]) - new Date(a[historySortField]);
     });
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 font-quattrocento">
+        <div className="bg-white p-8 rounded border shadow-xl w-full max-w-md">
+          <h2 className="text-2xl font-bold mb-4 text-black">Login Required</h2>
+          <p className="text-gray-600 mb-4">Please enter the studio management password.</p>
+          <input 
+            type="password" 
+            placeholder="Password" 
+            className="w-full border p-2 mb-4 rounded text-black" 
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = e.target.value;
+                setPassword(val);
+                localStorage.setItem('admin_password', val);
+                setIsAuthorized(true);
+                setTimeout(loadData, 100);
+              }
+            }}
+          />
+          <button 
+            className="w-full bg-black text-white p-2 rounded hover:bg-gray-800"
+            onClick={(e) => {
+              const input = e.target.previousSibling;
+              const val = input.value;
+              setPassword(val);
+              localStorage.setItem('admin_password', val);
+              setIsAuthorized(true);
+              setTimeout(loadData, 100);
+            }}
+          >
+            Access Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-white font-quattrocento text-black">
