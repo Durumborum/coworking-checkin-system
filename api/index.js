@@ -33,13 +33,17 @@ const authMiddleware = (req, res, next) => {
 app.use(authMiddleware);
 
 // ---------------- DATABASE CONNECTION ----------------
+const DB_URL = process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+if (!DB_URL) {
+  console.warn('⚠️ Warning: No database connection string found in environment variables!');
+}
+
 const pool = new Pool({
-  connectionString: process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL, 
-  ssl: (process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL)?.includes('localhost') 
-    ? false 
-    : {
-        rejectUnauthorized: false
-      }
+  connectionString: DB_URL, 
+  ssl: {
+    rejectUnauthorized: false // Force ignore self-signed certs
+  }
 });
 
 // ---------------- INITIALIZE DATABASE TABLES ----------------
