@@ -1,8 +1,12 @@
 // ---------------- IMPORTS ----------------
-const express = require('express'); // Express framework for building API
-const cors = require('cors'); // Enable Cross-Origin Resource Sharing
-const { Pool } = require('pg'); // PostgreSQL client
-const path = require('path'); // Node.js path utilities
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+const path = require('path');
+
+// THE NUCLEAR OPTION: Bypass SSL certificate verification globally
+// This is necessary because some Vercel environments fail to recognize Supabase certs
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
