@@ -35,9 +35,11 @@ app.use(authMiddleware);
 // ---------------- DATABASE CONNECTION ----------------
 const pool = new Pool({
   connectionString: process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL, 
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: (process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL)?.includes('localhost') 
+    ? false 
+    : {
+        rejectUnauthorized: false
+      }
 });
 
 // ---------------- INITIALIZE DATABASE TABLES ----------------
