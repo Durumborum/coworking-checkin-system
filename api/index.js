@@ -43,7 +43,6 @@ const pool = new Pool({
 });
 
 // ---------------- INITIALIZE DATABASE TABLES ----------------
-// Idempotent table creation
 const initDatabase = async () => {
   try {
     await pool.query(`
@@ -68,13 +67,15 @@ const initDatabase = async () => {
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
     `);
-    console.log('✓ Database tables verified');
+    console.log('✓ Database tables verified/created successfully');
+    return true;
   } catch (error) {
     console.error('Database initialization error:', error);
+    return false;
   }
 };
-// On Vercel, we call this but don't block. 
-// For better performance, consider running this as a separate migration script.
+
+// Initial call (will be repeated in health check for certainty)
 initDatabase();
 
 // ---------------- API ROUTES ----------------
@@ -84,8 +85,11 @@ app.get('/api/health', async (req, res) => {
   const dbConfigured = !!(process.env.RAMI_POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL);
   
   let dbStatus = 'Not Configured';
+  let tablesInitialized = false;
+
   if (dbConfigured) {
     try {
+      tablesInitialized = await initDatabase();
       const result = await pool.query('SELECT NOW()');
       dbStatus = 'Connected';
     } catch (err) {
@@ -97,6 +101,7 @@ app.get('/api/health', async (req, res) => {
     status: 'ok', 
     database: 'supabase', 
     database_status: dbStatus,
+    tables_initialized: tablesInitialized,
     timestamp: new Date().toISOString() 
   });
 });
