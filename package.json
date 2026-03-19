@@ -4,10 +4,8 @@
   "description": "NFC-based check-in system for coworking spaces",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "build": "cd frontend && npm install && npm run build",
-    "postinstall": "cd frontend && npm install"
+    "start": "node api/index.js",
+    "dev": "node api/index.js"
   },
   "keywords": [
     "nfc",
