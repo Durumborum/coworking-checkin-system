@@ -1,4 +1,3 @@
-cat > nfc_reader.py << 'EOF'
 #!/usr/bin/env python3
 """
 NFC Card Reader for Coworking Check-in System
@@ -11,8 +10,7 @@ import time
 from datetime import datetime
 
 # Configuration - UPDATE THIS with your deployed Railway URL
-API_URL = "http://localhost:3000/api/checkin"  # Change to your Railway URL after deployment
-# Example: API_URL = "https://your-app.railway.app/api/checkin"
+API_URL = "https://coworking-checkin-system-production.up.railway.app/api/checkin"
 
 def read_nfc_card():
     """
@@ -106,7 +104,3 @@ if __name__ == '__main__':
 ╚════════════════════════════════════════════════╝
     """)
     read_nfc_card()
-EOF
-
-# Make it executable
-chmod +x nfc_reader.py
